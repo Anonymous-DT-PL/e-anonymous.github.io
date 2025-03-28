@@ -6,14 +6,20 @@ dotenv.config();
 
 // Encryption functions
 function encryptData(data, secretKey) {
-    const cipher = crypto.createCipher('aes-256-cbc', secretKey);
+    const cipher = crypto.createCipheriv('aes-256-cbc', 
+        Buffer.from(secretKey, 'hex').slice(0, 32), 
+        Buffer.from(secretKey.slice(32, 64), 'hex')
+    );
     let encrypted = cipher.update(JSON.stringify(data), 'utf8', 'hex');
     encrypted += cipher.final('hex');
     return encrypted;
 }
 
 function decryptData(encryptedData, secretKey) {
-    const decipher = crypto.createDecipher('aes-256-cbc', secretKey);
+    const decipher = crypto.createDecipheriv('aes-256-cbc', 
+        Buffer.from(secretKey, 'hex').slice(0, 32), 
+        Buffer.from(secretKey.slice(32, 64), 'hex')
+    );
     let decrypted = decipher.update(encryptedData, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
     return JSON.parse(decrypted);
@@ -37,21 +43,35 @@ export async function registerUser(username, email, password) {
         throw new Error('Użytkownik o tym adresie email już istnieje');
     }
 
-    // Hash password
-    const salt = crypto.randomBytes(16).toString('hex');
-    const hashedPassword = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
+    // Generate a unique encryption key for this user
+    const userEncryptionKey = crypto.randomBytes(64).toString('hex');
 
-    // Encrypt sensitive data
-    const encryptedUserData = encryptData({
+    // Hash password with a salt
+    const salt = crypto.randomBytes(16).toString('hex');
+    const hashedPassword = crypto.pbkdf2Sync(
+        password, 
+        salt, 
+        1000, 
+        64, 
+        'sha512'
+    ).toString('hex');
+
+    // Prepare encrypted user data
+    const userData = {
         username,
         email,
-        hashedPassword,
-        salt
-    }, process.env.ENCRYPTION_KEY);
+        salt,
+        hashedPassword
+    };
 
-    // Insert user
+    // Encrypt the entire user data
+    const encryptedUserData = encryptData(userData, userEncryptionKey);
+
+    // Store encrypted data and encryption key separately
     const result = await usersCollection.insertOne({
-        encryptedData: encryptedUserData
+        email,
+        encryptedData: encryptedUserData,
+        encryptionKeyHash: crypto.createHash('sha256').update(userEncryptionKey).digest('hex')
     });
 
     return result.insertedId;
@@ -62,65 +82,52 @@ export async function loginUser(email, password) {
     const db = await connectToDatabase();
     const usersCollection = db.collection('users');
 
-    const userRecord = await usersCollection.findOne({ 'encryptedData': { $exists: true } });
+    // Find user by email
+    const userRecord = await usersCollection.findOne({ email });
     if (!userRecord) {
         throw new Error('Użytkownik nie został znaleziony');
     }
 
-    // Decrypt user data
-    const userData = decryptData(userRecord.encryptedData, process.env.ENCRYPTION_KEY);
+    // Try to decrypt user data
+    let userData;
+    try {
+        // In a real-world scenario, you would securely manage and retrieve the encryption key
+        // This is a simplified example
+        const userEncryptionKey = process.env.MASTER_ENCRYPTION_KEY;
+        
+        userData = decryptData(userRecord.encryptedData, userEncryptionKey);
+    } catch (error) {
+        throw new Error('Błąd podczas deszyfrowania danych');
+    }
 
     // Verify password
-    const hashedInputPassword = crypto.pbkdf2Sync(password, userData.salt, 1000, 64, 'sha512').toString('hex');
+    const hashedInputPassword = crypto.pbkdf2Sync(
+        password, 
+        userData.salt, 
+        1000, 
+        64, 
+        'sha512'
+    ).toString('hex');
     
     if (hashedInputPassword !== userData.hashedPassword) {
         throw new Error('Nieprawidłowe hasło');
     }
 
-    // Generate JWT token
-    const token = generateJWT(userData);
+    // Generate JWT or session token
+    const token = generateToken(userData);
     return token;
 }
 
-// Google OAuth login
-export async function loginWithGoogle(googleProfile) {
-    const db = await connectToDatabase();
-    const usersCollection = db.collection('users');
-
-    // Check if user exists with this Google ID
-    let userRecord = await usersCollection.findOne({ 
-        'encryptedData.googleId': googleProfile.id 
-    });
-
-    if (!userRecord) {
-        // Create new user if not exists
-        const encryptedUserData = encryptData({
-            username: googleProfile.name,
-            email: googleProfile.email,
-            googleId: googleProfile.id
-        }, process.env.ENCRYPTION_KEY);
-
-        userRecord = await usersCollection.insertOne({
-            encryptedData: encryptedUserData
-        });
-    }
-
-    // Generate JWT token
-    const userData = decryptData(userRecord.encryptedData, process.env.ENCRYPTION_KEY);
-    const token = generateJWT(userData);
-    return token;
-}
-
-// JWT Token Generation
-function generateJWT(userData) {
-    // In a real-world scenario, use a proper JWT library like 'jsonwebtoken'
+// Token Generation
+function generateToken(userData) {
+    // In a production environment, use a proper JWT library
     const payload = {
-        userId: userData._id,
         email: userData.email,
-        username: userData.username
+        username: userData.username,
+        timestamp: Date.now()
     };
 
-    // Simple token generation (replace with proper JWT in production)
+    // Simple token generation
     return Buffer.from(JSON.stringify(payload)).toString('base64');
 }
 
@@ -129,19 +136,11 @@ export async function verifyToken(token) {
     try {
         const payload = JSON.parse(Buffer.from(token, 'base64').toString('utf-8'));
         
-        const db = await connectToDatabase();
-        const usersCollection = db.collection('users');
-
-        const userRecord = await usersCollection.findOne({ 
-            'encryptedData': { $exists: true } 
-        });
-
-        if (!userRecord) {
-            throw new Error('Token is invalid');
-        }
-
+        // Additional verification can be added here
+        // For example, check token expiration, validate against database, etc.
+        
         return payload;
     } catch (error) {
-        throw new Error('Invalid token');
+        throw new Error('Nieprawidłowy token');
     }
 }

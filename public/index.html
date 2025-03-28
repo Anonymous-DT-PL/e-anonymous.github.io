@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CinemaX - Galeria</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/lucide-react/0.263.1/lucide.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-dark: #0f0f0f;
+            --secondary-dark: #1a1a1a;
+            --accent-color: #4a4a4a;
+            --text-color: #e0e0e0;
+            --highlight-color: #6b4eff;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', 'Arial', sans-serif;
+            background-color: var(--primary-dark);
+            color: var(--text-color);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Navigation Styles */
+        .nav-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            z-index: 1000;
+            background: rgba(15, 15, 15, 0.7);
+            backdrop-filter: blur(15px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .nav-wrapper {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 1rem 2rem;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--highlight-color);
+            letter-spacing: 1px;
+        }
+
+        .logo-placeholder {
+            width: 50px;
+            height: 50px;
+            background-color: var(--highlight-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 10px;
+            color: var(--primary-dark);
+            font-weight: bold;
+        }
+
+        .nav-menu {
+            display: flex;
+            gap: 1.5rem;
+            align-items: center;
+        }
+
+        .nav-link {
+            color: var(--text-color);
+            text-decoration: none;
+            font-weight: 500;
+            position: relative;
+            transition: color 0.3s ease;
+        }
+
+        .nav-link::after {
+            content: '';
+            position: absolute;
+            width: 0;
+            height: 2px;
+            bottom: -5px;
+            left: 0;
+            background-color: var(--highlight-color);
+            transition: width 0.3s ease;
+        }
+
+        .nav-link:hover {
+            color: var(--highlight-color);
+        }
+
+        .nav-link:hover::after {
+            width: 100%;
+        }
+
+        /* Settings Dropdown */
+        .settings-dropdown {
+            position: relative;
+        }
+
+        .settings-icon {
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+
+        .settings-icon:hover {
+            transform: rotate(90deg);
+        }
+
+        .dropdown-menu {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background-color: var(--secondary-dark);
+            border-radius: 10px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+            overflow: hidden;
+            width: 200px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: opacity 0.3s ease, transform 0.3s ease, visibility 0.3s;
+            z-index: 1100;
+        }
+
+        .settings-dropdown:hover .dropdown-menu {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 15px;
+            color: var(--text-color);
+            text-decoration: none;
+            transition: background-color 0.3s ease;
+        }
+
+        .dropdown-item:hover {
+            background-color: var(--accent-color);
+        }
+
+        .dropdown-item svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        /* Carousel Container */
+        .gallery-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            padding-top: 80px;
+            background-color: var(--primary-dark);
+            min-height: 100vh;
+        }
+
+        .section-container {
+            width: 100%;
+            max-width: 1200px;
+            margin: 2rem 0;
+        }
+
+        .section-title {
+            text-align: center;
+            margin-bottom: 2rem;
+            font-size: 2rem;
+            color: var(--text-color);
+        }
+
+        .carousel-wrapper {
+            width: 100%;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .carousel {
+            display: flex;
+            transition: transform 0.5s ease;
+            width: 100%;
+        }
+
+        .carousel-item {
+            flex: 0 0 400px;
+            height: 300px;
+            margin: 0 1rem;
+            position: relative;
+            border-radius: 15px;
+            overflow: hidden;
+            transition: transform 0.4s ease, box-shadow 0.4s ease;
+        }
+
+        .carousel-item:hover {
+            transform: scale(1.05);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.4);
+        }
+
+        .carousel-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            filter: grayscale(70%);
+            transition: filter 0.3s ease;
+        }
+
+        .carousel-item:hover img {
+            filter: grayscale(0%);
+        }
+
+        .carousel-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.7);
+            color: var(--text-color);
+            padding: 1rem;
+            text-align: center;
+            transform: translateY(100%);
+            transition: transform 0.3s ease;
+        }
+
+        .carousel-item:hover .carousel-overlay {
+            transform: translateY(0);
+        }
+
+        /* Dots Navigation */
+        .carousel-dots {
+            display: flex;
+            justify-content: center;
+            margin-top: 1rem;
+        }
+
+        .dot {
+            height: 10px;
+            width: 10px;
+            background-color: var(--accent-color);
+            border-radius: 50%;
+            margin: 0 0.5rem;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .dot.active {
+            background-color: var(--highlight-color);
+        }
+
+        /* Footer Styles */
+        .footer-separator {
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(to right, transparent, var(--highlight-color), transparent);
+            margin: 2rem 0;
+        }
+
+        .footer {
+            background-color: var(--secondary-dark);
+            padding: 2rem 1rem;
+            text-align: center;
+        }
+
+        .footer-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 1.5rem;
+        }
+
+        .footer-column {
+            flex: 1;
+            min-width: 150px;
+        }
+
+        .footer-column h4 {
+            color: var(--highlight-color);
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+        }
+
+        .footer-links {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .footer-link {
+            color: var(--text-color);
+            text-decoration: none;
+            margin-bottom: 0.5rem;
+            transition: color 0.3s ease;
+        }
+
+        .footer-link:hover {
+            color: var(--highlight-color);
+        }
+
+        .footer-bottom {
+            margin-top: 2rem;
+            font-size: 0.9rem;
+            color: var(--accent-color);
+        }
+
+        @media (max-width: 768px) {
+            .footer-content {
+                flex-direction: column;
+                align-items: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="nav-container">
+        <div class="nav-wrapper">
+            <div class="logo-container">
+                <div class="logo-placeholder">DT</div>
+                <div class="logo">Anonymmous-DT</div>
+            </div>
+            <div class="nav-menu">
+                <a href="#" class="nav-link">Filmy</a>
+                <a href="#" class="nav-link">Zdjęcia</a>
+                <a href="#" class="nav-link">Seriale</a>
+                <div class="settings-dropdown">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="settings-icon lucide lucide-settings" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+                        <circle cx="12" cy="12" r="3"/>
+                    </svg>
+                    <div class="dropdown-menu">
+                        <a href="#" class="dropdown-item">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="lucide lucide-log-in" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+                                <polyline points="10 17 15 12 10 7"/>
+                                <line x1="15" x2="3" y1="12" y2="12"/>
+                            </svg>
+                            Logowanie
+                        </a>
+                        <a href="#" class="dropdown-item">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="lucide lucide-user-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                                <circle cx="9" cy="7" r="4"/>
+                                <line x1="19" y1="8" x2="19" y2="14"/>
+                                <line x1="22" y1="11" x2="16" y2="11"/>
+                            </svg>
+                            Rejestracja
+                        </a>
+                        <a href="#" class="dropdown-item">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="lucide lucide-message-square" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                            </svg>
+                            Forum
+                        </a>
+                        <a href="#" class="dropdown-item">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="lucide lucide-at-sign" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="4"/>
+                                <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"/>
+                            </svg>
+                            Discord
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="gallery-container">
+        <!-- Movies Section -->
+        <div class="section-container">
+            <h2 class="section-title">Filmy</h2>
+            <div class="carousel-wrapper">
+                <div class="carousel" id="movies-carousel">
+                    <!-- Movies will be dynamically added here -->
+                </div>
+            </div>
+            <div class="carousel-dots" id="movies-dots"></div>
+        </div>
+
+        <!-- Photos Section -->
+        <div class="section-container">
+            <h2 class="section-title">Zdjęcia</h2>
+            <div class="carousel-wrapper">
+                <div class="carousel" id="photos-carousel">
+                    <!-- Photos will be dynamically added here -->
+                </div>
+            </div>
+            <div class="carousel-dots" id="photos-dots"></div>
+        </div>
+    </div>
+
+    <!-- Separator stopki -->
+    <div class="footer-separator"></div>
+
+    <!-- Stopka -->
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-column">
+                <h4>Serwis</h4>
+                <div class="footer-links">
+                    <a href="#" class="footer-link">Rejestracja</a>
+                    <a href="#" class="footer-link">Logowanie</a>
+                    <a href="#" class="footer-link">Licencja</a>
+                    <a href="#" class="footer-link">Prywatność</a>
+                </div>
+            </div>
+            <div class="footer-column">
+                <h4>Multimedia</h4>
+                <div class="footer-links">
+                    <a href="#" class="footer-link">Filmy</a>
+                    <a href="#" class="footer-link">Zdjęcia</a>
+                    <a href="#" class="footer-link">Twitch</a>
+                    <a href="#" class="footer-link">YouTube</a>
+                </div>
+            </div>
+            <div class="footer-column">
+                <h4>Społeczność</h4>
+                <div class="footer-links">
+                    <a href="#" class="footer-link">Forum</a>
+                    <a href="#" class="footer-link">Discord</a>
+                    <a href="#" class="footer-link">Kontakt</a>
+                    <a href="#" class="footer-link">Regulamin</a>
+                </div>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            © 2025 Anonymous-DT. Wszelkie prawa zastrzeżone.
+        </div>
+    </footer>
+
+    <script>
+        // Carousel Configuration
+        const carouselConfigs = [
+            {
+                id: 'movies-carousel',
+                dotsId: 'movies-dots',
+                items: [
+                    { title: 'Film 1', image: '/api/placeholder/400/300' },
+                    { title: 'Film 2', image: '/api/placeholder/400/300' },
+                    { title: 'Film 3', image: '/api/placeholder/400/300' },
+                    { title: 'Film 4', image: '/api/placeholder/400/300' },
+                    { title: 'Film 5', image: '/api/placeholder/400/300' }
+                ],
+                autoScrollInterval: 5000 // Slower auto-scroll for movies (5 seconds)
+            },
+            {
+                id: 'photos-carousel',
+                dotsId: 'photos-dots',
+                items: [
+                    { title: 'Zdjęcie 1', image: '/api/placeholder/400/300' },
+                    { title: 'Zdjęcie 2', image: '/api/placeholder/400/300' },
+                    { title: 'Zdjęcie 3', image: '/api/placeholder/400/300' },
+                    { title: 'Zdjęcie 4', image: '/api/placeholder/400/300' },
+                    { title: 'Zdjęcie 5', image: '/api/placeholder/400/300' }
+                ],
+                autoScrollInterval: 3000 // Faster auto-scroll for photos (3 seconds)
+            }
+        ];
+
+        // Initialize Carousels
+        function initCarousel(config) {
+            const carousel = document.getElementById(config.id);
+            const dotsContainer = document.getElementById(config.dotsId);
+
+            // Populate Carousel
+            config.items.forEach((item, index) => {
+                const carouselItem = document.createElement('div');
+                carouselItem.classList.add('carousel-item');
+                
+                const img = document.createElement('img');
+                img.src = item.image;
+                img.alt = item.title;
+                
+                const overlay = document.createElement('div');
+                overlay.classList.add('carousel-overlay');
+                overlay.textContent = item.title;
+                
+                carouselItem.appendChild(img);
+                carouselItem.appendChild(overlay);
+                carousel.appendChild(carouselItem);
+
+                // Create dot
+                const dot = document.createElement('div');
+                dot.classList.add('dot');
+                if (index === 0) dot.classList.add('active');
+                dot.addEventListener('click', () => moveToSlide(config, index));
+                dotsContainer.appendChild(dot);
+            });
+
+            // Auto Scroll
+            let currentIndex = 0;
+            function autoScroll() {
+                currentIndex = (currentIndex + 1) % config.items.length;
+                moveToSlide(config, currentIndex);
+            }
+
+            // Start Auto Scroll
+            const autoScrollInterval = setInterval(autoScroll, 3000);
+        }
+
+        // Move to Specific Slide
+        function moveToSlide(config, index) {
+            const carousel = document.getElementById(config.id);
+            const carouselWidth = carousel.querySelector('.carousel-item').offsetWidth;
+            const gap = parseInt(window.getComputedStyle(carousel).gap) || 0;
+            
+            // Move carousel
+            carousel.style.transform = `translateX(-${(carouselWidth + gap) * index}px)`;
+            
+            // Update dots
+            const dots = document.getElementById(config.dotsId).children;
+            Array.from(dots).forEach((dot, i) => {
+                dot.classList.toggle('active', i === index);
+            });
+        }
+
+        // Initialize All Carousels
+        carouselConfigs.forEach(initCarousel);
+    </script>
+</body>
+</html>

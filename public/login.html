@@ -3,10 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>E-Anonymous - Rejestracja</title>
+    <title>E-Anonymous - Logowanie</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/lucide-react/0.263.1/lucide.min.css" rel="stylesheet">
     <style>
-        /* Reuse styles from index.html for consistency */
         :root {
             --primary-dark: #0f0f0f;
             --secondary-dark: #1a1a1a;
@@ -33,7 +32,7 @@
             padding: 2rem;
         }
 
-        .register-container {
+        .login-container {
             background-color: var(--secondary-dark);
             border-radius: 15px;
             box-shadow: 0 15px 35px rgba(0,0,0,0.4);
@@ -42,7 +41,7 @@
             padding: 2rem;
         }
 
-        .register-title {
+        .login-title {
             text-align: center;
             margin-bottom: 1.5rem;
             color: var(--highlight-color);
@@ -129,34 +128,47 @@
             height: 24px;
         }
 
-        .login-link {
+        .register-link {
             text-align: center;
             margin-top: 1rem;
         }
 
-        .login-link a {
+        .register-link a {
             color: var(--highlight-color);
             text-decoration: none;
+        }
+
+        .forgot-password {
+            text-align: right;
+            margin-bottom: 1rem;
+        }
+
+        .forgot-password a {
+            color: var(--accent-color);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.3s ease;
+        }
+
+        .forgot-password a:hover {
+            color: var(--highlight-color);
         }
     </style>
 </head>
 <body>
-    <div class="register-container">
-        <h2 class="register-title">Rejestracja</h2>
-        <form id="registerForm">
-            <div class="form-group">
-                <input type="text" id="username" class="form-input" placeholder="Nazwa użytkownika" required>
-            </div>
+    <div class="login-container">
+        <h2 class="login-title">Logowanie</h2>
+        <form id="loginForm">
             <div class="form-group">
                 <input type="email" id="email" class="form-input" placeholder="Adres email" required>
             </div>
             <div class="form-group">
                 <input type="password" id="password" class="form-input" placeholder="Hasło" required>
             </div>
-            <div class="form-group">
-                <input type="password" id="confirmPassword" class="form-input" placeholder="Potwierdź hasło" required>
+            <div class="forgot-password">
+                <a href="#">Zapomniałeś hasła?</a>
             </div>
-            <button type="submit" class="btn">Zarejestruj się</button>
+            <button type="submit" class="btn">Zaloguj się</button>
         </form>
 
         <div class="oauth-divider">
@@ -174,29 +186,22 @@
             </button>
         </div>
 
-        <div class="login-link">
-            Masz już konto? <a href="/login.html">Zaloguj się</a>
+        <div class="register-link">
+            Nie masz konta? <a href="/register.html">Zarejestruj się</a>
         </div>
     </div>
 
     <script type="module">
-        import { registerUser, loginWithGoogle } from './auth.js';
+        import { loginUser, loginWithGoogle } from './auth.js';
 
-        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const username = document.getElementById('username').value;
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
-            const confirmPassword = document.getElementById('confirmPassword').value;
-
-            if (password !== confirmPassword) {
-                alert('Hasła nie są takie same');
-                return;
-            }
 
             try {
-                await registerUser(username, email, password);
-                alert('Rejestracja zakończona sukcesem');
+                const token = await loginUser(email, password);
+                localStorage.setItem('discordToken', token);
                 window.location.href = '/dashboard.html';
             } catch (error) {
                 alert(error.message);

@@ -1,7 +1,7 @@
 import express from 'express';
 import { Client } from 'discord.js';
 import dotenv from 'dotenv';
-import { registerUser, loginUser, loginWithGoogle, verifyToken } from './auth.js'; // Import your auth functions
+import { registerUser, loginUser, loginWithGoogle, verifyToken } from './public/auth.js'; // Import your auth functions
 
 // Environment configuration
 dotenv.config();

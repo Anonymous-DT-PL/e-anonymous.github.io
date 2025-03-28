@@ -4,16 +4,24 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "node server.js"
+    "test": "node server.js"    
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
   "type": "module",
   "dependencies": {
     "discord.js": "^14.18.0",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "http-server": "^14.1.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Anonymous-DT-PL/e-anonymous.github.io.git"
+  },
+  "author": "Trellix",
+  "license": "GPL-3.0-or-later",
+  "bugs": {
+    "url": "https://github.com/Anonymous-DT-PL/e-anonymous.github.io"
   }
+
 }

@@ -10,9 +10,12 @@
   "type": "module",
   "dependencies": {
     "crypto": "^1.0.1",
+    "crypto-js": "^4.2.0",
     "discord.js": "^14.18.0",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
+    "google-auth-library": "^9.15.1",
+    "googleapis": "^148.0.0",
     "http-server": "^14.1.1",
     "mongodb": "^6.15.0"
   },

@@ -1,4 +1,4 @@
-import crypto from 'crypto';
+import * as crypto from 'node:crypto';
 import { MongoClient } from 'mongodb';
 import dotenv from 'dotenv';
 
@@ -91,8 +91,7 @@ export async function loginUser(email, password) {
     // Try to decrypt user data
     let userData;
     try {
-        // In a real-world scenario, you would securely manage and retrieve the encryption key
-        // This is a simplified example
+        // Use the pre-stored encryption key method or your master key
         const userEncryptionKey = process.env.MASTER_ENCRYPTION_KEY;
         
         userData = decryptData(userRecord.encryptedData, userEncryptionKey);
@@ -116,6 +115,51 @@ export async function loginUser(email, password) {
     // Generate JWT or session token
     const token = generateToken(userData);
     return token;
+}
+
+// Login with Google
+export async function loginWithGoogle(googleProfile) {
+    const db = await connectToDatabase();
+    const usersCollection = db.collection('users');
+
+    // Check if user already exists
+    let userRecord = await usersCollection.findOne({ 
+        email: googleProfile.email 
+    });
+
+    if (!userRecord) {
+        // Generate a unique encryption key for this user
+        const userEncryptionKey = crypto.randomBytes(64).toString('hex');
+
+        // User data
+        const userData = {
+            username: googleProfile.name || googleProfile.email.split('@')[0],
+            email: googleProfile.email,
+            googleId: googleProfile.sub,
+            avatar: googleProfile.picture || null
+        };
+
+        // Encrypt user data
+        const encryptedUserData = encryptData(userData, userEncryptionKey);
+
+        // Save to database
+        const result = await usersCollection.insertOne({
+            email: googleProfile.email,
+            encryptedData: encryptedUserData,
+            encryptionKeyHash: crypto.createHash('sha256')
+                .update(userEncryptionKey)
+                .digest('hex')
+        });
+
+        userRecord = result;
+    }
+
+    // Decrypt user data
+    const userEncryptionKey = process.env.MASTER_ENCRYPTION_KEY;
+    const userData = decryptData(userRecord.encryptedData, userEncryptionKey);
+
+    // Generate token
+    return generateToken(userData);
 }
 
 // Token Generation

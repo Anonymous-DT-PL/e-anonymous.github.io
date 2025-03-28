@@ -1,7 +1,9 @@
 import express from 'express';
 import { Client } from 'discord.js';
+import { OAuth2Client } from 'google-auth-library';
+import { google } from 'googleapis';
 import dotenv from 'dotenv';
-import { registerUser, loginUser, loginWithGoogle, verifyToken } from './public/auth.js'; // Import your auth functions
+import { registerUser, loginUser, loginWithGoogle, verifyToken } from './public/auth.js';
 
 // Environment configuration
 dotenv.config();
@@ -18,10 +20,59 @@ const client = new Client({
 });
 client.login(process.env.DISCORD_BOT_TOKEN);
 
+// Inicjalizacja klienta Google OAuth
+const googleOauthClient = new OAuth2Client(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    'http://localhost:3000/oauth2callback' // URL przekierowania
+);
+
 // Discord OAuth Endpoint
 app.get('/login', (req, res) => {
     const url = `https://discord.com/api/oauth2/authorize?client_id=${process.env.DISCORD_CLIENT_ID}&permissions=0&scope=bot%20applications.commands`;
     res.redirect(url);
+});
+
+// Endpoint inicjalizacji logowania Google
+app.get('/login/google', (req, res) => {
+    const scopes = [
+        'https://www.googleapis.com/auth/userinfo.email',
+        'https://www.googleapis.com/auth/userinfo.profile'
+    ];
+    const url = googleOauthClient.generateAuthUrl({
+        access_type: 'offline',
+        scope: scopes
+    });
+    res.redirect(url);
+});
+
+// Endpoint callback po autoryzacji Google
+app.get('/oauth2callback', async (req, res) => {
+    try {
+        const { code } = req.query;
+        
+        // Wymiana kodu na tokeny
+        const { tokens } = await googleOauthClient.getToken(code);
+        googleOauthClient.setCredentials(tokens);
+        
+        // Pobranie informacji o użytkowniku
+        const oauth2 = google.oauth2('v2');
+        const userInfo = await oauth2.userinfo.get({ auth: googleOauthClient });
+        
+        // Logowanie/rejestracja użytkownika
+        const token = await loginWithGoogle({
+            email: userInfo.data.email,
+            name: userInfo.data.name,
+            picture: userInfo.data.picture,
+            sub: userInfo.data.id
+        });
+        
+        // Przekierowanie z tokenem
+        res.redirect(`/dashboard?token=${token}`);
+    } catch (error) {
+        console.error('Błąd autoryzacji Google:', error);
+        res.redirect('/login?error=oauth_failed');
+    }
 });
 
 // Registration Endpoint
@@ -46,7 +97,7 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// Google OAuth Endpoint
+// Google OAuth Endpoint (Alternative method)
 app.post('/api/login/google', async (req, res) => {
     try {
         const { googleProfile } = req.body;

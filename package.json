@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "node server.js"    
+    "test": "node server.js"
   },
   "keywords": [],
   "type": "module",
@@ -12,7 +12,8 @@
     "discord.js": "^14.18.0",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
-    "http-server": "^14.1.1"
+    "http-server": "^14.1.1",
+    "mongodb": "^6.15.0"
   },
   "repository": {
     "type": "git",
@@ -23,5 +24,4 @@
   "bugs": {
     "url": "https://github.com/Anonymous-DT-PL/e-anonymous.github.io"
   }
-
 }

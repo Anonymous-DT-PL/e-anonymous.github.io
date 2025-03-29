@@ -4,6 +4,12 @@ import { OAuth2Client } from 'google-auth-library';
 import { google } from 'googleapis';
 import dotenv from 'dotenv';
 import { registerUser, loginUser, loginWithGoogle, verifyToken } from './public/auth.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Uzyskanie ścieżki bieżącego pliku dla ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Environment configuration
 dotenv.config();
@@ -12,7 +18,7 @@ const app = express();
 
 // Middleware
 app.use(express.json());
-app.use(express.static('./public'));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Discord bot initialization
 const client = new Client({
@@ -148,6 +154,21 @@ app.get('/api/placeholder/:width/:height', (req, res) => {
   </svg>`;
   
   res.send(svg);
+});
+
+// Dodajemy trasę główną która zawsze serwuje index.html
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Dodanie trasy catch-all dla SPA
+app.get('*', (req, res) => {
+  // Sprawdzamy czy żądanie dotyczy API
+  if (!req.path.startsWith('/api')) {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  } else {
+    res.status(404).json({ message: 'API endpoint not found' });
+  }
 });
 
 // Server Configuration

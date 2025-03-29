@@ -133,6 +133,23 @@ app.get('/api/dashboard', authenticateToken, (req, res) => {
     });
 });
 
+// Obsługa endpointu placeholder dla obrazów
+app.get('/api/placeholder/:width/:height', (req, res) => {
+  const width = parseInt(req.params.width, 10) || 400;
+  const height = parseInt(req.params.height, 10) || 300;
+  
+  // Ustawienie nagłówków dla SVG
+  res.setHeader('Content-Type', 'image/svg+xml');
+  
+  // Generowanie prostego SVG jako placeholder
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+    <rect width="100%" height="100%" fill="#e0e0e0"/>
+    <text x="50%" y="50%" font-family="Arial" font-size="24" text-anchor="middle" dominant-baseline="middle" fill="#666">${width}x${height}</text>
+  </svg>`;
+  
+  res.send(svg);
+});
+
 // Server Configuration
 const PORT = process.env.PORT || 8079;
 app.listen(PORT, () => {

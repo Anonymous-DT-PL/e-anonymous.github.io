@@ -24,7 +24,7 @@ client.login(process.env.DISCORD_BOT_TOKEN);
 const googleOauthClient = new OAuth2Client(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
-    'http://localhost:3000/oauth2callback' // URL przekierowania
+    'http://localhost:8080/oauth2callback' // URL przekierowania
 );
 
 // Discord OAuth Endpoint
@@ -134,7 +134,7 @@ app.get('/api/dashboard', authenticateToken, (req, res) => {
 });
 
 // Server Configuration
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });

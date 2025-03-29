@@ -3,7 +3,7 @@ import { Client } from 'discord.js';
 import { OAuth2Client } from 'google-auth-library';
 import { google } from 'googleapis';
 import dotenv from 'dotenv';
-import { registerUser, loginUser, loginWithGoogle, verifyToken } from './public/auth.js';
+import { registerUser, loginUser, loginWithGoogle, verifyToken } from './auth.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -18,7 +18,7 @@ const app = express();
 
 // Middleware
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(__dirname)); // Serwowanie plików statycznych z głównego katalogu
 
 // Discord bot initialization
 const client = new Client({
@@ -129,7 +129,7 @@ function authenticateToken(req, res, next) {
     } catch (error) {
         res.status(403).json({ message: 'Invalid token' });
     }
-}
+};
 
 // Protected Route Example
 app.get('/api/dashboard', authenticateToken, (req, res) => {
@@ -156,16 +156,29 @@ app.get('/api/placeholder/:width/:height', (req, res) => {
   res.send(svg);
 });
 
+// Obsługa konkretnych stron HTML
+app.get('/index.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+app.get('/login.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'login.html'));
+});
+
+app.get('/register.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'register.html'));
+});
+
 // Dodajemy trasę główną która zawsze serwuje index.html
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 // Dodanie trasy catch-all dla SPA
 app.get('*', (req, res) => {
   // Sprawdzamy czy żądanie dotyczy API
   if (!req.path.startsWith('/api')) {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    res.sendFile(path.join(__dirname, 'index.html'));
   } else {
     res.status(404).json({ message: 'API endpoint not found' });
   }

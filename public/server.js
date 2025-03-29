@@ -12,7 +12,7 @@ const app = express();
 
 // Middleware
 app.use(express.json());
-app.use(express.static('public'));
+app.use(express.static('./public'));
 
 // Discord bot initialization
 const client = new Client({

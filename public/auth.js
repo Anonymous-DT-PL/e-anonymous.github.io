@@ -1,3 +1,5 @@
+// /public\auth.js
+
 import * as crypto from 'node:crypto';
 import { MongoClient } from 'mongodb';
 import dotenv from 'dotenv';

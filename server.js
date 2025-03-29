@@ -185,7 +185,6 @@ app.get('*', (req, res) => {
 });
 
 // Server Configuration
-const PORT = process.env.PORT || 8079;
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on port ${PORT}`);
 });

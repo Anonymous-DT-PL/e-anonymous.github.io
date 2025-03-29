@@ -3,7 +3,7 @@ import { Client } from 'discord.js';
 import { OAuth2Client } from 'google-auth-library';
 import { google } from 'googleapis';
 import dotenv from 'dotenv';
-import { registerUser, loginUser, loginWithGoogle, verifyToken } from './public/auth.js';
+import { registerUser, loginUser, loginWithGoogle, verifyToken } from './auth.js';
 
 // Environment configuration
 dotenv.config();

@@ -1,7 +1,11 @@
 // stats.js
-import { getAuthToken } from './auth-client.js';
-import AUTH_CONFIG from './auth-config.js';
+import { getAuthToken } from '/js/auth-client.js';
+import AUTH_CONFIG from '/js/auth-config.js';
 
+/**
+ * Pobiera statystyki z API
+ * @returns {Promise<Object>} Obiekt ze statystykami
+ */
 export async function getStats() {
     try {
         const response = await fetch(AUTH_CONFIG.endpoints.stats, {
@@ -21,7 +25,11 @@ export async function getStats() {
     }
 }
 
-// Helper function to render stats
+/**
+ * Funkcja pomocnicza do renderowania statystyk jako HTML
+ * @param {Object} stats Obiekt ze statystykami
+ * @returns {string} Kod HTML z statystykami
+ */
 export function renderStats(stats) {
     if (!stats) {
         return '<p>Brak dostępnych statystyk</p>';

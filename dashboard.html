@@ -356,11 +356,176 @@
     </div>
 
     <script type="module">
-        import { isLoggedIn, logout, getAuthToken } from './js/auth-client.js';
-        import { getCommands, toggleCommand } from './js/commands.js';
-        import { getStats } from './js/stats.js';
+        import { isLoggedIn, logout, getAuthToken } from '/js/auth-client.js';
+        import { getCommands, toggleCommand } from '/js/commands.js';
+        import { getStats } from '/js/stats.js';
+        import AUTH_CONFIG from '/js/auth-config.js';
+        
+        // Funkcja do wyświetlania powiadomień
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toastMessage');
+            
+            toastMessage.textContent = message;
+            toast.className = `toast ${type} show`;
+            
+            setTimeout(() => {
+                toast.className = 'toast';
+            }, 3000);
+        }
 
-        // Inicjalizacja klasy DatabaseController
+        // Funkcja do aktualizacji panelu sterowania
+        async function updateDashboard() {
+            try {
+                // Pobierz komendy
+                const commands = await getCommands();
+                renderCommands(commands);
+                
+                // Pobierz statystyki
+                const stats = await getStats();
+                renderStats(stats);
+            } catch (error) {
+                console.error('Błąd podczas aktualizacji panelu:', error);
+                showToast('Błąd podczas aktualizacji panelu', 'error');
+            }
+        }
+
+        // Funkcja do renderowania komend
+        function renderCommands(commands) {
+            const commandsContainer = document.getElementById('commands');
+            
+            if (!commands || commands.length === 0) {
+                commandsContainer.innerHTML = '<p>Brak dostępnych komend</p>';
+                return;
+            }
+            
+            let html = '';
+            commands.forEach(command => {
+                html += `
+                    <div class="command-item">
+                        <div class="command-info">
+                            <h3>${command.name}</h3>
+                            <p>${command.description}</p>
+                        </div>
+                        <button class="btn ${command.active ? 'btn-secondary' : 'btn-danger'}" 
+                            data-id="${command.id}" data-active="${command.active}">
+                            ${command.active ? 'Wyłącz' : 'Włącz'}
+                        </button>
+                    </div>
+                `;
+            });
+            
+            commandsContainer.innerHTML = html;
+            
+            // Dodaj obsługę przycisków
+            commandsContainer.querySelectorAll('.btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const id = e.target.dataset.id;
+                    const active = e.target.dataset.active === 'true';
+                    
+                    try {
+                        await toggleCommand(id, !active);
+                        showToast(`Komenda została ${!active ? 'włączona' : 'wyłączona'}`, 'success');
+                        updateDashboard(); // Odśwież panel
+                    } catch (error) {
+                        console.error('Błąd podczas przełączania komendy:', error);
+                        showToast('Błąd podczas przełączania komendy', 'error');
+                    }
+                });
+            });
+        }
+
+        // Sprawdź czy użytkownik jest zalogowany
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Jeśli nie jest zalogowany, przekieruj do strony logowania
+            if (!isLoggedIn()) {
+                window.location.href = '/login.html';
+                return;
+            }
+
+            // Sprawdź token i pobierz dane użytkownika
+            try {
+                const response = await fetch('/api/dashboard', {
+                    headers: {
+                        'Authorization': `Bearer ${getAuthToken()}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Nieprawidłowy token');
+                }
+
+                const data = await response.json();
+                document.getElementById('username').textContent = data.user.username || 'Użytkownik';
+                
+                // Załaduj komendy i statystyki
+                updateDashboard();
+                
+                // Inicjalizuj kontroler bazy danych
+                if (window.electronAPI) {
+                    window.databaseController = new DatabaseController(window.electronAPI);
+                } else {
+                    console.warn('API Electrona nie jest dostępne');
+                    document.getElementById('dbStatus').textContent = 'API Electrona nie jest dostępne';
+                }
+                
+                // Inicjalizuj przyciski akcji
+                initActionButtons();
+                
+                // Dodaj obsługę przycisku wylogowania
+                document.getElementById('logoutBtn').addEventListener('click', () => {
+                    logout();
+                });
+                
+                // Dodaj obsługę przycisków odświeżania
+                document.getElementById('refreshCommandsBtn').addEventListener('click', async () => {
+                    try {
+                        const commands = await getCommands();
+                        renderCommands(commands);
+                        showToast('Komendy zostały odświeżone', 'success');
+                    } catch (error) {
+                        console.error('Błąd podczas odświeżania komend:', error);
+                        showToast('Błąd podczas odświeżania komend', 'error');
+                    }
+                });
+                
+                document.getElementById('refreshStatsBtn').addEventListener('click', async () => {
+                    try {
+                        const stats = await getStats();
+                        renderStats(stats);
+                        showToast('Statystyki zostały odświeżone', 'success');
+                    } catch (error) {
+                        console.error('Błąd podczas odświeżania statystyk:', error);
+                        showToast('Błąd podczas odświeżania statystyk', 'error');
+                    }
+                });
+                
+            } catch (error) {
+                console.error('Błąd autoryzacji:', error);
+                logout(); // Wyloguj użytkownika w przypadku błędu autoryzacji
+            }
+        });
+    </script>
+</body>
+</html>
+
+        // Funkcja do renderowania statystyk
+        function renderStats(stats) {
+            const statsContainer = document.getElementById('stats');
+            
+            if (!stats) {
+                statsContainer.innerHTML = '<p>Brak dostępnych statystyk</p>';
+                return;
+            }
+            
+            let statsText = `Liczba użytkowników: ${stats.users}\n`;
+            statsText += `Liczba serwerów: ${stats.servers}\n`;
+            statsText += `Użyto komend: ${stats.commands_used}\n`;
+            
+            statsContainer.textContent = statsText;
+        }
+
+        // Inicjalizacja kontrolera bazy danych
         class DatabaseController {
             constructor(electronAPI) {
                 this.electronAPI = electronAPI;
@@ -455,96 +620,6 @@
             }
         }
 
-        // Funkcja do wyświetlania powiadomień
-        function showToast(message, type = 'success') {
-            const toast = document.getElementById('toast');
-            const toastMessage = document.getElementById('toastMessage');
-            
-            toastMessage.textContent = message;
-            toast.className = `toast ${type} show`;
-            
-            setTimeout(() => {
-                toast.className = 'toast';
-            }, 3000);
-        }
-
-        // Funkcja do aktualizacji panelu sterowania
-        async function updateDashboard() {
-            try {
-                // Pobierz komendy
-                const commands = await getCommands();
-                renderCommands(commands);
-                
-                // Pobierz statystyki
-                const stats = await getStats();
-                renderStats(stats);
-            } catch (error) {
-                console.error('Błąd podczas aktualizacji panelu:', error);
-                showToast('Błąd podczas aktualizacji panelu', 'error');
-            }
-        }
-
-        // Funkcja do renderowania komend
-        function renderCommands(commands) {
-            const commandsContainer = document.getElementById('commands');
-            
-            if (!commands || commands.length === 0) {
-                commandsContainer.innerHTML = '<p>Brak dostępnych komend</p>';
-                return;
-            }
-            
-            let html = '';
-            commands.forEach(command => {
-                html += `
-                    <div class="command-item">
-                        <div class="command-info">
-                            <h3>${command.name}</h3>
-                            <p>${command.description}</p>
-                        </div>
-                        <button class="btn ${command.active ? 'btn-secondary' : 'btn-danger'}" 
-                            data-id="${command.id}" data-active="${command.active}">
-                            ${command.active ? 'Wyłącz' : 'Włącz'}
-                        </button>
-                    </div>
-                `;
-            });
-            
-            commandsContainer.innerHTML = html;
-            
-            // Dodaj obsługę przycisków
-            commandsContainer.querySelectorAll('.btn').forEach(btn => {
-                btn.addEventListener('click', async (e) => {
-                    const id = e.target.dataset.id;
-                    const active = e.target.dataset.active === 'true';
-                    
-                    try {
-                        await toggleCommand(id, !active);
-                        showToast(`Komenda została ${!active ? 'włączona' : 'wyłączona'}`, 'success');
-                        updateDashboard(); // Odśwież panel
-                    } catch (error) {
-                        console.error('Błąd podczas przełączania komendy:', error);
-                        showToast('Błąd podczas przełączania komendy', 'error');
-                    }
-                });
-            });
-        }
-
-        // Funkcja do renderowania statystyk
-        function renderStats(stats) {
-            const statsContainer = document.getElementById('stats');
-            
-            if (!stats) {
-                statsContainer.innerHTML = '<p>Brak dostępnych statystyk</p>';
-                return;
-            }
-            
-            let statsText = `Liczba użytkowników: ${stats.users}\n`;
-            statsText += `Liczba serwerów: ${stats.servers}\n`;
-            statsText += `Użyto komend: ${stats.commands_used}\n`;
-            
-            statsContainer.textContent = statsText;
-        }
-
         // Funkcja do inicjalizacji przycisków akcji
         function initActionButtons() {
             const startBotBtn = document.getElementById('startBot');
@@ -616,138 +691,3 @@
                 }
             });
         }
-
-        // Sprawdź czy użytkownik jest zalogowany
-        document.addEventListener('DOMContentLoaded', async () => {
-            // Jeśli nie jest zalogowany, przekieruj do strony logowania
-            if (!isLoggedIn()) {
-                window.location.href = '/login.html';
-                return;
-            }
-
-            // Sprawdź token i pobierz dane użytkownika
-            try {
-                const response = await fetch('/api/dashboard', {
-                    headers: {
-                        'Authorization': `Bearer ${getAuthToken()}`
-                    }
-                });
-
-                if (!response.ok) {
-                    throw new Error('Nieprawidłowy token');
-                }
-
-                const data = await response.json();
-                document.getElementById('username').textContent = data.user.username || 'Użytkownik';
-                
-                // Załaduj komendy i statystyki
-                updateDashboard();
-                
-                // Inicjalizuj kontroler bazy danych
-                if (window.electronAPI) {
-                    window.databaseController = new DatabaseController(window.electronAPI);
-                } else {
-                    console.warn('API Electrona nie jest dostępne');
-                    document.getElementById('dbStatus').textContent = 'API Electrona nie jest dostępne';
-                }
-                
-                // Inicjalizuj przyciski akcji
-                initActionButtons();
-                
-                // Dodaj obsługę przycisku wylogowania
-                document.getElementById('logoutBtn').addEventListener('click', () => {
-                    logout();
-                });
-                
-                // Dodaj obsługę przycisków odświeżania
-                document.getElementById('refreshCommandsBtn').addEventListener('click', async () => {
-                    try {
-                        const commands = await getCommands();
-                        renderCommands(commands);
-                        showToast('Komendy zostały odświeżone', 'success');
-                    } catch (error) {
-                        console.error('Błąd podczas odświeżania komend:', error);
-                        showToast('Błąd podczas odświeżania komend', 'error');
-                    }
-                });
-                
-                document.getElementById('refreshStatsBtn').addEventListener('click', async () => {
-                    try {
-                        const stats = await getStats();
-                        renderStats(stats);
-                        showToast('Statystyki zostały odświeżone', 'success');
-                    } catch (error) {
-                        console.error('Błąd podczas odświeżania statystyk:', error);
-                        showToast('Błąd podczas odświeżania statystyk', 'error');
-                    }
-                });
-                
-            } catch (error) {
-                console.error('Błąd autoryzacji:', error);
-                logout(); // Wyloguj użytkownika w przypadku błędu autoryzacji
-            }
-        });
-
-        // Przygotuj moduł commands.js jeśli nie istnieje
-        if (typeof getCommands !== 'function') {
-            window.getCommands = async function() {
-                try {
-                    const response = await fetch('/api/commands', {
-                        headers: {
-                            'Authorization': `Bearer ${getAuthToken()}`
-                        }
-                    });
-                    
-                    if (!response.ok) throw new Error('Nie udało się pobrać komend');
-                    
-                    const data = await response.json();
-                    return data.commands;
-                } catch (error) {
-                    console.error('Błąd pobierania komend:', error);
-                    throw error;
-                }
-            };
-            
-            window.toggleCommand = async function(id, active) {
-                try {
-                    const response = await fetch(`/api/commands/${id}/toggle`, {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${getAuthToken()}`,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ active })
-                    });
-                    
-                    if (!response.ok) throw new Error('Nie udało się przełączyć komendy');
-                    
-                    return await response.json();
-                } catch (error) {
-                    console.error('Błąd przełączania komendy:', error);
-                    throw error;
-                }
-            };
-        }
-        
-        // Przygotuj moduł stats.js jeśli nie istnieje
-        if (typeof getStats !== 'function') {
-            window.getStats = async function() {
-                try {
-                    const response = await fetch('/api/stats', {
-                        headers: {
-                            'Authorization': `Bearer ${getAuthToken()}`
-                        }
-                    });
-                    
-                    if (!response.ok) throw new Error('Nie udało się pobrać statystyk');
-                    
-                    return await response.json();
-                } catch (error) {
-                    console.error('Błąd pobierania statystyk:', error);
-                    throw error;
-                }
-            };
-        }
-    </script>
-</body>
-</html>

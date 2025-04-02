@@ -1,7 +1,11 @@
 // commands.js
-import { getAuthToken } from './auth-client.js';
-import AUTH_CONFIG from './auth-config.js';
+import { getAuthToken } from '/js/auth-client.js';
+import AUTH_CONFIG from '/js/auth-config.js';
 
+/**
+ * Pobiera listę dostępnych komend z API
+ * @returns {Promise<Array>} Lista komend
+ */
 export async function getCommands() {
     try {
         const response = await fetch(AUTH_CONFIG.endpoints.commands, {
@@ -22,6 +26,12 @@ export async function getCommands() {
     }
 }
 
+/**
+ * Przełącza stan komendy (aktywna/nieaktywna)
+ * @param {string} commandId ID komendy do przełączenia
+ * @param {boolean} active Nowy stan komendy (true - aktywna, false - nieaktywna)
+ * @returns {Promise<Object>} Rezultat operacji
+ */
 export async function toggleCommand(commandId, active) {
     try {
         const response = await fetch(`${AUTH_CONFIG.endpoints.commands}/${commandId}/toggle`, {
@@ -44,25 +54,12 @@ export async function toggleCommand(commandId, active) {
     }
 }
 
-export async function updateDashboard() {
-    try {
-        const commands = await getCommands();
-        const stats = await getStats();
-        
-        if (document.getElementById('commands')) {
-            document.getElementById('commands').innerHTML = renderCommands(commands);
-        }
-        
-        if (document.getElementById('stats')) {
-            document.getElementById('stats').innerHTML = renderStats(stats);
-        }
-    } catch (error) {
-        console.error('Błąd aktualizacji dashboarda:', error);
-    }
-}
-
-// Helper function to render commands
-function renderCommands(commands) {
+/**
+ * Funkcja pomocnicza do renderowania komend jako HTML
+ * @param {Array} commands Lista komend do wyrenderowania
+ * @returns {string} Kod HTML z komendami
+ */
+export function renderCommands(commands) {
     if (!commands || commands.length === 0) {
         return '<p>Brak dostępnych komend</p>';
     }
@@ -74,7 +71,7 @@ function renderCommands(commands) {
                 <p>${command.description}</p>
             </div>
             <button class="btn ${command.active ? 'btn-secondary' : 'btn-danger'}" 
-                data-id="${command.id}" data-active="${command.active}" onclick="toggleCommand('${command.id}', ${!command.active})">
+                data-id="${command.id}" data-active="${command.active}">
                 ${command.active ? 'Wyłącz' : 'Włącz'}
             </button>
         </div>
@@ -84,5 +81,5 @@ function renderCommands(commands) {
 export default {
     getCommands,
     toggleCommand,
-    updateDashboard
+    renderCommands
 };

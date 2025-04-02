@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-Anonymous - Panel Sterowania</title>
+    <style>
+        :root {
+            --primary-dark: #0f0f0f;
+            --secondary-dark: #1a1a1a;
+            --accent-color: #4a4a4a;
+            --text-color: #e0e0e0;
+            --highlight-color: #6b4eff;
+            --success-color: #4CAF50;
+            --warning-color: #FFC107;
+            --error-color: #FF5252;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', 'Arial', sans-serif;
+            background-color: var(--primary-dark);
+            color: var(--text-color);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        header {
+            background-color: var(--secondary-dark);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--highlight-color);
+        }
+
+        nav ul {
+            display: flex;
+            list-style: none;
+            gap: 2rem;
+        }
+
+        nav a {
+            color: var(--text-color);
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        nav a:hover {
+            color: var(--highlight-color);
+        }
+
+        .user-section {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            background-color: var(--highlight-color);
+            color: var(--text-color);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+
+        .btn:hover {
+            background-color: #5a3ecf;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background-color: var(--accent-color);
+        }
+
+        .btn-danger {
+            background-color: var(--error-color);
+        }
+
+        main {
+            padding: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+
+        .card {
+            background-color: var(--secondary-dark);
+            border-radius: 15px;
+            padding: 1.5rem;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .card-title {
+            margin-bottom: 1rem;
+            color: var(--highlight-color);
+            font-size: 1.25rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .command-item {
+            background-color: var(--primary-dark);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .command-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .command-item h3 {
+            margin-bottom: 0.5rem;
+        }
+
+        .command-info {
+            flex: 1;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            background-color: var(--accent-color);
+        }
+
+        .status.running {
+            background-color: var(--success-color);
+        }
+
+        .status.stopped {
+            background-color: var(--error-color);
+        }
+
+        .status.warning {
+            background-color: var(--warning-color);
+        }
+
+        .error {
+            color: var(--error-color);
+            margin: 1rem 0;
+        }
+        
+        #stats {
+            font-family: monospace;
+            white-space: pre-wrap;
+            background-color: var(--primary-dark);
+            padding: 1rem;
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+        
+        @media (max-width: 768px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            header {
+                flex-direction: column;
+                padding: 1rem;
+                gap: 1rem;
+            }
+            
+            nav ul {
+                gap: 1rem;
+            }
+        }
+
+        /* Styl dla sekcji bazy danych */
+        .db-control {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .db-control input {
+            width: 100%;
+            padding: 0.5rem;
+            background-color: var(--primary-dark);
+            border: 1px solid var(--accent-color);
+            border-radius: 8px;
+            color: var(--text-color);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 1rem;
+        }
+
+        /* Styl dla sekcji działań */
+        .actions-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .action-btn {
+            padding: 1rem;
+            text-align: center;
+            background-color: var(--primary-dark);
+            border-radius: 8px;
+            border: 1px solid var(--accent-color);
+            color: var(--text-color);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .action-btn:hover {
+            background-color: var(--accent-color);
+            transform: translateY(-2px);
+        }
+
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 1rem;
+            background-color: var(--secondary-dark);
+            color: var(--text-color);
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            transition: transform 0.3s ease, opacity 0.3s ease;
+            transform: translateY(100px);
+            opacity: 0;
+            z-index: 1000;
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .toast.success {
+            border-left: 4px solid var(--success-color);
+        }
+
+        .toast.error {
+            border-left: 4px solid var(--error-color);
+        }
+
+        .toast.warning {
+            border-left: 4px solid var(--warning-color);
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo">E-Anonymous Dashboard</div>
+        <nav>
+            <ul>
+                <li><a href="#" class="active">Panel</a></li>
+                <li><a href="#">Komendy</a></li>
+                <li><a href="#">Statystyki</a></li>
+                <li><a href="#">Ustawienia</a></li>
+            </ul>
+        </nav>
+        <div class="user-section">
+            <span id="username">Ładowanie...</span>
+            <button id="logoutBtn" class="btn btn-secondary">Wyloguj</button>
+        </div>
+    </header>
+
+    <main>
+        <h1>Panel Sterowania</h1>
+        <p>Witaj w panelu administracyjnym E-Anonymous.</p>
+
+        <div class="dashboard-grid">
+            <div class="card">
+                <div class="card-title">
+                    <h2>Komendy</h2>
+                    <button class="btn btn-secondary" id="refreshCommandsBtn">Odśwież</button>
+                </div>
+                <div id="commands">
+                    <p>Ładowanie komend...</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">
+                    <h2>Statystyki</h2>
+                    <button class="btn btn-secondary" id="refreshStatsBtn">Odśwież</button>
+                </div>
+                <div id="stats">
+                    <p>Ładowanie statystyk...</p>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-title">
+                    <h2>Baza danych</h2>
+                </div>
+                <div>
+                    <p id="dbStatus" class="status stopped">Brak połączenia z bazą danych</p>
+                    
+                    <div class="db-control">
+                        <input type="text" id="dbPath" placeholder="Ścieżka do bazy danych" readonly>
+                        <div class="button-group">
+                            <button id="selectDatabase" class="btn">Wybierz bazę danych</button>
+                            <button id="disconnectDatabase" class="btn btn-danger" disabled>Rozłącz</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">
+                    <h2>Szybkie działania</h2>
+                </div>
+                <div class="actions-grid">
+                    <button class="action-btn" id="startBot">
+                        Uruchom bota
+                    </button>
+                    <button class="action-btn" id="stopBot">
+                        Zatrzymaj bota
+                    </button>
+                    <button class="action-btn" id="backupData">
+                        Wykonaj kopię zapasową
+                    </button>
+                    <button class="action-btn" id="exportLogs">
+                        Eksportuj logi
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="toast" class="toast">
+        <p id="toastMessage"></p>
+    </div>
+
+    <script type="module">
+        import { isLoggedIn, logout, getAuthToken } from './js/auth-client.js';
+        import { getCommands, toggleCommand } from './js/commands.js';
+        import { getStats } from './js/stats.js';
+
+        // Inicjalizacja klasy DatabaseController
+        class DatabaseController {
+            constructor(electronAPI) {
+                this.electronAPI = electronAPI;
+                this.dbPath = null;
+                this.connected = false;
+                
+                this.init();
+            }
+            
+            init() {
+                const selectBtn = document.getElementById('selectDatabase');
+                const disconnectBtn = document.getElementById('disconnectDatabase');
+                
+                selectBtn.addEventListener('click', () => this.selectDatabase());
+                disconnectBtn.addEventListener('click', () => this.disconnectDatabase());
+                
+                // Sprawdź stan połączenia przy starcie
+                this.checkConnection();
+            }
+            
+            async checkConnection() {
+                if (!this.electronAPI) return;
+                
+                try {
+                    const connection = await this.electronAPI.getDatabaseConnection();
+                    if (connection.connected) {
+                        this.connected = true;
+                        this.dbPath = connection.path;
+                        this.updateUI(true);
+                    } else {
+                        this.updateUI(false);
+                    }
+                } catch (error) {
+                    console.error('Błąd sprawdzania połączenia:', error);
+                    this.updateUI(false);
+                }
+            }
+            
+            async selectDatabase() {
+                if (!this.electronAPI) {
+                    showToast('API Electrona nie jest dostępne', 'error');
+                    return;
+                }
+                
+                try {
+                    const result = await this.electronAPI.selectDatabase();
+                    if (result.success) {
+                        this.connected = true;
+                        this.dbPath = result.path;
+                        this.updateUI(true);
+                        showToast('Połączono z bazą danych', 'success');
+                    } else {
+                        showToast('Nie wybrano bazy danych', 'warning');
+                    }
+                } catch (error) {
+                    console.error('Błąd podczas wybierania bazy danych:', error);
+                    showToast('Błąd podczas wybierania bazy danych', 'error');
+                }
+            }
+            
+            async disconnectDatabase() {
+                if (!this.electronAPI) return;
+                
+                try {
+                    await this.electronAPI.disconnectDatabase();
+                    this.connected = false;
+                    this.dbPath = null;
+                    this.updateUI(false);
+                    showToast('Rozłączono z bazą danych', 'success');
+                } catch (error) {
+                    console.error('Błąd podczas rozłączania bazy danych:', error);
+                    showToast('Błąd podczas rozłączania bazy danych', 'error');
+                }
+            }
+            
+            updateUI(connected) {
+                const dbStatus = document.getElementById('dbStatus');
+                const dbPath = document.getElementById('dbPath');
+                const disconnectBtn = document.getElementById('disconnectDatabase');
+                
+                if (connected) {
+                    dbStatus.textContent = 'Połączono';
+                    dbStatus.className = 'status running';
+                    dbPath.value = this.dbPath;
+                    disconnectBtn.disabled = false;
+                } else {
+                    dbStatus.textContent = 'Brak połączenia z bazą danych';
+                    dbStatus.className = 'status stopped';
+                    dbPath.value = '';
+                    disconnectBtn.disabled = true;
+                }
+            }
+        }
+
+        // Funkcja do wyświetlania powiadomień
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toastMessage');
+            
+            toastMessage.textContent = message;
+            toast.className = `toast ${type} show`;
+            
+            setTimeout(() => {
+                toast.className = 'toast';
+            }, 3000);
+        }
+
+        // Funkcja do aktualizacji panelu sterowania
+        async function updateDashboard() {
+            try {
+                // Pobierz komendy
+                const commands = await getCommands();
+                renderCommands(commands);
+                
+                // Pobierz statystyki
+                const stats = await getStats();
+                renderStats(stats);
+            } catch (error) {
+                console.error('Błąd podczas aktualizacji panelu:', error);
+                showToast('Błąd podczas aktualizacji panelu', 'error');
+            }
+        }
+
+        // Funkcja do renderowania komend
+        function renderCommands(commands) {
+            const commandsContainer = document.getElementById('commands');
+            
+            if (!commands || commands.length === 0) {
+                commandsContainer.innerHTML = '<p>Brak dostępnych komend</p>';
+                return;
+            }
+            
+            let html = '';
+            commands.forEach(command => {
+                html += `
+                    <div class="command-item">
+                        <div class="command-info">
+                            <h3>${command.name}</h3>
+                            <p>${command.description}</p>
+                        </div>
+                        <button class="btn ${command.active ? 'btn-secondary' : 'btn-danger'}" 
+                            data-id="${command.id}" data-active="${command.active}">
+                            ${command.active ? 'Wyłącz' : 'Włącz'}
+                        </button>
+                    </div>
+                `;
+            });
+            
+            commandsContainer.innerHTML = html;
+            
+            // Dodaj obsługę przycisków
+            commandsContainer.querySelectorAll('.btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const id = e.target.dataset.id;
+                    const active = e.target.dataset.active === 'true';
+                    
+                    try {
+                        await toggleCommand(id, !active);
+                        showToast(`Komenda została ${!active ? 'włączona' : 'wyłączona'}`, 'success');
+                        updateDashboard(); // Odśwież panel
+                    } catch (error) {
+                        console.error('Błąd podczas przełączania komendy:', error);
+                        showToast('Błąd podczas przełączania komendy', 'error');
+                    }
+                });
+            });
+        }
+
+        // Funkcja do renderowania statystyk
+        function renderStats(stats) {
+            const statsContainer = document.getElementById('stats');
+            
+            if (!stats) {
+                statsContainer.innerHTML = '<p>Brak dostępnych statystyk</p>';
+                return;
+            }
+            
+            let statsText = `Liczba użytkowników: ${stats.users}\n`;
+            statsText += `Liczba serwerów: ${stats.servers}\n`;
+            statsText += `Użyto komend: ${stats.commands_used}\n`;
+            
+            statsContainer.textContent = statsText;
+        }
+
+        // Funkcja do inicjalizacji przycisków akcji
+        function initActionButtons() {
+            const startBotBtn = document.getElementById('startBot');
+            const stopBotBtn = document.getElementById('stopBot');
+            const backupDataBtn = document.getElementById('backupData');
+            const exportLogsBtn = document.getElementById('exportLogs');
+            
+            startBotBtn.addEventListener('click', () => {
+                if (window.electronAPI) {
+                    window.electronAPI.startBot()
+                        .then(() => showToast('Bot został uruchomiony', 'success'))
+                        .catch(err => {
+                            console.error('Błąd uruchamiania bota:', err);
+                            showToast('Błąd uruchamiania bota', 'error');
+                        });
+                } else {
+                    showToast('Funkcja niedostępna w przeglądarce', 'warning');
+                }
+            });
+            
+            stopBotBtn.addEventListener('click', () => {
+                if (window.electronAPI) {
+                    window.electronAPI.stopBot()
+                        .then(() => showToast('Bot został zatrzymany', 'success'))
+                        .catch(err => {
+                            console.error('Błąd zatrzymywania bota:', err);
+                            showToast('Błąd zatrzymywania bota', 'error');
+                        });
+                } else {
+                    showToast('Funkcja niedostępna w przeglądarce', 'warning');
+                }
+            });
+            
+            backupDataBtn.addEventListener('click', () => {
+                if (window.electronAPI) {
+                    window.electronAPI.backupData()
+                        .then(result => {
+                            if (result.success) {
+                                showToast(`Kopia zapasowa utworzona: ${result.path}`, 'success');
+                            } else {
+                                showToast('Nie udało się utworzyć kopii zapasowej', 'warning');
+                            }
+                        })
+                        .catch(err => {
+                            console.error('Błąd tworzenia kopii zapasowej:', err);
+                            showToast('Błąd tworzenia kopii zapasowej', 'error');
+                        });
+                } else {
+                    showToast('Funkcja niedostępna w przeglądarce', 'warning');
+                }
+            });
+            
+            exportLogsBtn.addEventListener('click', () => {
+                if (window.electronAPI) {
+                    window.electronAPI.exportLogs()
+                        .then(result => {
+                            if (result.success) {
+                                showToast(`Logi zostały wyeksportowane: ${result.path}`, 'success');
+                            } else {
+                                showToast('Nie udało się wyeksportować logów', 'warning');
+                            }
+                        })
+                        .catch(err => {
+                            console.error('Błąd eksportowania logów:', err);
+                            showToast('Błąd eksportowania logów', 'error');
+                        });
+                } else {
+                    showToast('Funkcja niedostępna w przeglądarce', 'warning');
+                }
+            });
+        }
+
+        // Sprawdź czy użytkownik jest zalogowany
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Jeśli nie jest zalogowany, przekieruj do strony logowania
+            if (!isLoggedIn()) {
+                window.location.href = '/login.html';
+                return;
+            }
+
+            // Sprawdź token i pobierz dane użytkownika
+            try {
+                const response = await fetch('/api/dashboard', {
+                    headers: {
+                        'Authorization': `Bearer ${getAuthToken()}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Nieprawidłowy token');
+                }
+
+                const data = await response.json();
+                document.getElementById('username').textContent = data.user.username || 'Użytkownik';
+                
+                // Załaduj komendy i statystyki
+                updateDashboard();
+                
+                // Inicjalizuj kontroler bazy danych
+                if (window.electronAPI) {
+                    window.databaseController = new DatabaseController(window.electronAPI);
+                } else {
+                    console.warn('API Electrona nie jest dostępne');
+                    document.getElementById('dbStatus').textContent = 'API Electrona nie jest dostępne';
+                }
+                
+                // Inicjalizuj przyciski akcji
+                initActionButtons();
+                
+                // Dodaj obsługę przycisku wylogowania
+                document.getElementById('logoutBtn').addEventListener('click', () => {
+                    logout();
+                });
+                
+                // Dodaj obsługę przycisków odświeżania
+                document.getElementById('refreshCommandsBtn').addEventListener('click', async () => {
+                    try {
+                        const commands = await getCommands();
+                        renderCommands(commands);
+                        showToast('Komendy zostały odświeżone', 'success');
+                    } catch (error) {
+                        console.error('Błąd podczas odświeżania komend:', error);
+                        showToast('Błąd podczas odświeżania komend', 'error');
+                    }
+                });
+                
+                document.getElementById('refreshStatsBtn').addEventListener('click', async () => {
+                    try {
+                        const stats = await getStats();
+                        renderStats(stats);
+                        showToast('Statystyki zostały odświeżone', 'success');
+                    } catch (error) {
+                        console.error('Błąd podczas odświeżania statystyk:', error);
+                        showToast('Błąd podczas odświeżania statystyk', 'error');
+                    }
+                });
+                
+            } catch (error) {
+                console.error('Błąd autoryzacji:', error);
+                logout(); // Wyloguj użytkownika w przypadku błędu autoryzacji
+            }
+        });
+
+        // Przygotuj moduł commands.js jeśli nie istnieje
+        if (typeof getCommands !== 'function') {
+            window.getCommands = async function() {
+                try {
+                    const response = await fetch('/api/commands', {
+                        headers: {
+                            'Authorization': `Bearer ${getAuthToken()}`
+                        }
+                    });
+                    
+                    if (!response.ok) throw new Error('Nie udało się pobrać komend');
+                    
+                    const data = await response.json();
+                    return data.commands;
+                } catch (error) {
+                    console.error('Błąd pobierania komend:', error);
+                    throw error;
+                }
+            };
+            
+            window.toggleCommand = async function(id, active) {
+                try {
+                    const response = await fetch(`/api/commands/${id}/toggle`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${getAuthToken()}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ active })
+                    });
+                    
+                    if (!response.ok) throw new Error('Nie udało się przełączyć komendy');
+                    
+                    return await response.json();
+                } catch (error) {
+                    console.error('Błąd przełączania komendy:', error);
+                    throw error;
+                }
+            };
+        }
+        
+        // Przygotuj moduł stats.js jeśli nie istnieje
+        if (typeof getStats !== 'function') {
+            window.getStats = async function() {
+                try {
+                    const response = await fetch('/api/stats', {
+                        headers: {
+                            'Authorization': `Bearer ${getAuthToken()}`
+                        }
+                    });
+                    
+                    if (!response.ok) throw new Error('Nie udało się pobrać statystyk');
+                    
+                    return await response.json();
+                } catch (error) {
+                    console.error('Błąd pobierania statystyk:', error);
+                    throw error;
+                }
+            };
+        }
+    </script>
+</body>
+</html>

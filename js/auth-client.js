@@ -1,10 +1,12 @@
-// /public\auth.js
+// auth.js - Combined backend and frontend authentication
 
 import * as crypto from 'node:crypto';
-import { MongoClient } from 'mongodb';
 import dotenv from 'dotenv';
 
 dotenv.config();
+
+// In-memory storage instead of MongoDB
+const users = new Map();
 
 // Encryption functions
 function encryptData(data, secretKey) {
@@ -27,21 +29,10 @@ function decryptData(encryptedData, secretKey) {
     return JSON.parse(decrypted);
 }
 
-// Database connection
-async function connectToDatabase() {
-    const client = new MongoClient(process.env.MONGODB_URI);
-    await client.connect();
-    return client.db(process.env.DB_NAME);
-}
-
-// User registration
-export async function registerUser(username, email, password) {
-    const db = await connectToDatabase();
-    const usersCollection = db.collection('users');
-
+// Backend functions
+export async function registerUserBackend(username, email, password) {
     // Check if user already exists
-    const existingUser = await usersCollection.findOne({ email });
-    if (existingUser) {
+    if (users.has(email)) {
         throw new Error('Użytkownik o tym adresie email już istnieje');
     }
 
@@ -69,23 +60,22 @@ export async function registerUser(username, email, password) {
     // Encrypt the entire user data
     const encryptedUserData = encryptData(userData, userEncryptionKey);
 
-    // Store encrypted data and encryption key separately
-    const result = await usersCollection.insertOne({
+    // Store encrypted data and encryption key in memory
+    const userId = crypto.randomUUID();
+    users.set(email, {
+        id: userId,
         email,
         encryptedData: encryptedUserData,
-        encryptionKeyHash: crypto.createHash('sha256').update(userEncryptionKey).digest('hex')
+        encryptionKeyHash: crypto.createHash('sha256').update(userEncryptionKey).digest('hex'),
+        encryptionKey: userEncryptionKey // In a real app, we wouldn't store this here
     });
 
-    return result.insertedId;
+    return userId;
 }
 
-// User login
-export async function loginUser(email, password) {
-    const db = await connectToDatabase();
-    const usersCollection = db.collection('users');
-
+export async function loginUserBackend(email, password) {
     // Find user by email
-    const userRecord = await usersCollection.findOne({ email });
+    const userRecord = users.get(email);
     if (!userRecord) {
         throw new Error('Użytkownik nie został znaleziony');
     }
@@ -93,8 +83,8 @@ export async function loginUser(email, password) {
     // Try to decrypt user data
     let userData;
     try {
-        // Use the pre-stored encryption key method or your master key
-        const userEncryptionKey = process.env.MASTER_ENCRYPTION_KEY;
+        // Use the stored encryption key (in a real app this would be more secure)
+        const userEncryptionKey = userRecord.encryptionKey;
         
         userData = decryptData(userRecord.encryptedData, userEncryptionKey);
     } catch (error) {
@@ -119,15 +109,9 @@ export async function loginUser(email, password) {
     return token;
 }
 
-// Login with Google
-export async function loginWithGoogle(googleProfile) {
-    const db = await connectToDatabase();
-    const usersCollection = db.collection('users');
-
+export async function loginWithGoogleBackend(googleProfile) {
     // Check if user already exists
-    let userRecord = await usersCollection.findOne({ 
-        email: googleProfile.email 
-    });
+    let userRecord = users.get(googleProfile.email);
 
     if (!userRecord) {
         // Generate a unique encryption key for this user
@@ -144,20 +128,21 @@ export async function loginWithGoogle(googleProfile) {
         // Encrypt user data
         const encryptedUserData = encryptData(userData, userEncryptionKey);
 
-        // Save to database
-        const result = await usersCollection.insertOne({
+        // Save to memory
+        const userId = crypto.randomUUID();
+        users.set(googleProfile.email, {
+            id: userId,
             email: googleProfile.email,
             encryptedData: encryptedUserData,
-            encryptionKeyHash: crypto.createHash('sha256')
-                .update(userEncryptionKey)
-                .digest('hex')
+            encryptionKeyHash: crypto.createHash('sha256').update(userEncryptionKey).digest('hex'),
+            encryptionKey: userEncryptionKey
         });
-
-        userRecord = result;
+        
+        userRecord = users.get(googleProfile.email);
     }
 
     // Decrypt user data
-    const userEncryptionKey = process.env.MASTER_ENCRYPTION_KEY;
+    const userEncryptionKey = userRecord.encryptionKey;
     const userData = decryptData(userRecord.encryptedData, userEncryptionKey);
 
     // Generate token
@@ -177,7 +162,6 @@ function generateToken(userData) {
     return Buffer.from(JSON.stringify(payload)).toString('base64');
 }
 
-// Token Verification
 export async function verifyToken(token) {
     try {
         const payload = JSON.parse(Buffer.from(token, 'base64').toString('utf-8'));
@@ -190,3 +174,80 @@ export async function verifyToken(token) {
         throw new Error('Nieprawidłowy token');
     }
 }
+
+// Client-side functions that work with the backend
+export async function registerUser(username, email, password) {
+    try {
+        const response = await fetch('/api/register', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ username, email, password })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Błąd rejestracji');
+        }
+
+        const data = await response.json();
+        return data.userId;
+    } catch (error) {
+        console.error('Błąd rejestracji:', error);
+        throw error;
+    }
+}
+
+export async function loginUser(email, password) {
+    try {
+        const response = await fetch('/api/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ email, password })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Błąd logowania');
+        }
+
+        const data = await response.json();
+        // Zapisz token w localStorage
+        localStorage.setItem('authToken', data.token);
+        return data.token;
+    } catch (error) {
+        console.error('Błąd logowania:', error);
+        throw error;
+    }
+}
+
+export function loginWithGoogle() {
+    // Przekieruj do endpointu logowania Google
+    window.location.href = '/login/google';
+}
+
+export function logout() {
+    localStorage.removeItem('authToken');
+    window.location.href = '/login.html';
+}
+
+export function isLoggedIn() {
+    return !!localStorage.getItem('authToken');
+}
+
+export function getAuthToken() {
+    return localStorage.getItem('authToken');
+}
+
+// Export for use in browser environments
+export const authClient = {
+    registerUser,
+    loginUser,
+    loginWithGoogle,
+    logout,
+    isLoggedIn,
+    getAuthToken
+};

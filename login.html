@@ -156,11 +156,19 @@
         .forgot-password a:hover {
             color: var(--highlight-color);
         }
+
+        .error-message {
+            color: #ff4d4d;
+            margin-bottom: 1rem;
+            text-align: center;
+            display: none;
+        }
     </style>
 </head>
 <body>
     <div class="login-container">
         <h2 class="login-title">Logowanie</h2>
+        <div id="errorMessage" class="error-message"></div>
         <form id="loginForm">
             <div class="form-group">
                 <input type="email" id="email" class="form-input" placeholder="Adres email" required>
@@ -196,28 +204,40 @@
     </div>
 
     <script type="module">
-        import { loginUser, loginWithGoogle } from './auth.js';
+        import { loginUser, loginWithGoogle } from './js/auth-client.js';
+
+        // Sprawdź, czy w URL jest parametr error
+        const urlParams = new URLSearchParams(window.location.search);
+        const errorParam = urlParams.get('error');
+        
+        if (errorParam) {
+            const errorMessage = document.getElementById('errorMessage');
+            errorMessage.style.display = 'block';
+            
+            if (errorParam === 'oauth_failed') {
+                errorMessage.textContent = 'Logowanie przez Google nie powiodło się. Spróbuj ponownie.';
+            } else {
+                errorMessage.textContent = 'Wystąpił błąd podczas logowania. Spróbuj ponownie.';
+            }
+        }
 
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
+            const errorMessage = document.getElementById('errorMessage');
 
             try {
                 const token = await loginUser(email, password);
-                localStorage.setItem('discordToken', token);
                 window.location.href = '/dashboard.html';
             } catch (error) {
-                alert(error.message);
+                errorMessage.textContent = error.message || 'Wystąpił błąd podczas logowania';
+                errorMessage.style.display = 'block';
             }
         });
 
-        document.getElementById('googleLogin').addEventListener('click', async () => {
-            try {
-                await loginWithGoogle();
-            } catch (error) {
-                alert(error.message);
-            }
+        document.getElementById('googleLogin').addEventListener('click', () => {
+            loginWithGoogle();
         });
     </script>
 </body>

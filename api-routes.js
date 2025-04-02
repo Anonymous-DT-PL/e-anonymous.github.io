@@ -1,6 +1,6 @@
 // api-routes.js
 import express from 'express';
-import { registerUserBackend, loginUserBackend, loginWithGoogleBackend, verifyToken } from './js/auth-client';
+import { registerUserBackend, loginUserBackend, loginWithGoogleBackend, verifyToken } from './js/auth-client.js';
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import dotenv from 'dotenv';
@@ -13,7 +13,7 @@ const router = express.Router();
 passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: "http://localhost:${PORT}/auth/google/callback"
+    callbackURL: `http://localhost:${process.env.PORT || 3000}/auth/google/callback`
   },
   async function(accessToken, refreshToken, profile, done) {
     try {
@@ -107,6 +107,33 @@ export const authenticateToken = async (req, res, next) => {
 // Protected route example
 router.get('/api/user/profile', authenticateToken, (req, res) => {
   res.json({ user: req.user });
+});
+
+// API dla komend i statystyk (przykładowe implementacje)
+router.get('/api/commands', authenticateToken, (req, res) => {
+  // Tutaj dodaj rzeczywistą implementację pobierania komend
+  const commands = [
+      { id: 'cmd1', name: 'Pomoc', description: 'Wyświetla dostępne komendy', active: true },
+      { id: 'cmd2', name: 'Info', description: 'Informacje o bocie', active: true }
+  ];
+  res.json({ commands });
+});
+
+router.post('/api/commands/:id/toggle', authenticateToken, (req, res) => {
+  const { id } = req.params;
+  const { active } = req.body || { active: false };
+  // Tutaj dodaj rzeczywistą implementację przełączania komend
+  res.json({ success: true, id, active });
+});
+
+router.get('/api/stats', authenticateToken, (req, res) => {
+  // Tutaj dodaj rzeczywistą implementację pobierania statystyk
+  const stats = {
+      users: 120,
+      servers: 5,
+      commands_used: 1450
+  };
+  res.json(stats);
 });
 
 export default router;

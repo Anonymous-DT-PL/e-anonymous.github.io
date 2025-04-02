@@ -205,6 +205,7 @@
 
     <script type="module">
         import { loginUser, loginWithGoogle } from './js/auth-client.js';
+        import AUTH_CONFIG from './js/auth-config.js';
 
         // Sprawdź, czy w URL jest parametr error
         const urlParams = new URLSearchParams(window.location.search);
@@ -215,7 +216,14 @@
             errorMessage.style.display = 'block';
             
             if (errorParam === 'oauth_failed') {
-                errorMessage.textContent = 'Logowanie przez Google nie powiodło się. Spróbuj ponownie.';
+                errorMessage.textContent = error.message || 'Wystąpił błąd podczas logowania';
+                errorMessage.style.display = 'block';
+            }
+        });
+
+        document.getElementById('googleLogin').addEventListener('click', () => {
+            loginWithGoogle();
+        });textContent = 'Logowanie przez Google nie powiodło się. Spróbuj ponownie.';
             } else {
                 errorMessage.textContent = 'Wystąpił błąd podczas logowania. Spróbuj ponownie.';
             }
@@ -229,16 +237,6 @@
 
             try {
                 const token = await loginUser(email, password);
-                window.location.href = '/dashboard.html';
+                window.location.href = AUTH_CONFIG.redirects.afterLogin;
             } catch (error) {
-                errorMessage.textContent = error.message || 'Wystąpił błąd podczas logowania';
-                errorMessage.style.display = 'block';
-            }
-        });
-
-        document.getElementById('googleLogin').addEventListener('click', () => {
-            loginWithGoogle();
-        });
-    </script>
-</body>
-</html>
+                errorMessage.

@@ -1,28 +1,28 @@
+// server.js
 import express from 'express';
-import { Client } from 'discord.js';
+import { fileURLToPath } from 'url';
+import path from 'path';
+import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import { OAuth2Client } from 'google-auth-library';
 import { google } from 'googleapis';
 import dotenv from 'dotenv';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import cors from 'cors';
-import cookieParser from 'cookie-parser';
 import { 
   registerUserBackend, 
   loginUserBackend, 
   loginWithGoogleBackend, 
   verifyToken 
-} from './js/auth-client';
+} from './js/auth-client.js';
+
+// Environment configuration
+dotenv.config();
 
 // Uzyskanie ścieżki bieżącego pliku dla ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Environment configuration
-dotenv.config();
-
-// Definicja portu - używaj zmiennej środowiskowej PORT lub domyślnie 8079
-const PORT = process.env.PORT || PORT;
+// Definicja portu - używaj zmiennej środowiskowej PORT lub domyślnie 3000
+const PORT = process.env.PORT || 3000;
 
 const app = express();
 
@@ -33,24 +33,11 @@ app.use(cors());
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public'))); // Serwowanie plików statycznych z katalogu public
 
-// Discord bot initialization
-const client = new Client({
-    intents: ['Guilds', 'GuildMessages']
-});
-
-// Próba zalogowania bota Discord, jeśli token jest dostępny
-if (process.env.DISCORD_BOT_TOKEN) {
-    client.login(process.env.DISCORD_BOT_TOKEN)
-        .catch(err => console.error('Błąd logowania bota Discord:', err));
-} else {
-    console.warn('DISCORD_BOT_TOKEN nie jest ustawiony w pliku .env');
-}
-
 // Inicjalizacja klienta Google OAuth
 const googleOauthClient = new OAuth2Client(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
-    `http://localhost:${PORT}/oauth2callback` // URL przekierowania
+    `http://localhost:${PORT}/auth/google/callback` // URL przekierowania
 );
 
 // Token Verification Middleware
@@ -123,7 +110,7 @@ app.get('/login/google', (req, res) => {
     res.redirect(url);
 });
 
-app.get('/oauth2callback', async (req, res) => {
+app.get('/auth/google/callback', async (req, res) => {
     try {
         const { code } = req.query;
         
@@ -184,8 +171,9 @@ app.get('/api/commands', authenticateToken, (req, res) => {
 
 app.post('/api/commands/:id/toggle', authenticateToken, (req, res) => {
     const { id } = req.params;
+    const { active } = req.body;
     // Tutaj dodaj rzeczywistą implementację przełączania komend
-    res.json({ success: true, id });
+    res.json({ success: true, id, active });
 });
 
 app.get('/api/stats', authenticateToken, (req, res) => {
@@ -221,18 +209,18 @@ app.get('/', (req, res) => {
 });
 
 app.get('/login', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'login.html'));
+    res.sendFile(path.join(__dirname, 'login.html'));
 });
 
 app.get('/register', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'register.html'));
+    res.sendFile(path.join(__dirname, 'register.html'));
 });
 
 // Dodanie trasy catch-all dla SPA
 app.get('*', (req, res) => {
     // Sprawdzamy czy żądanie dotyczy API
     if (!req.path.startsWith('/api')) {
-        res.sendFile(path.join(__dirname, 'public', 'index.html'));
+        res.sendFile(path.join(__dirname, 'index.html'));
     } else {
         res.status(404).json({ message: 'API endpoint not found' });
     }
@@ -242,3 +230,5 @@ app.get('*', (req, res) => {
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on port ${PORT}`);
 });
+
+export { app, authenticateToken };

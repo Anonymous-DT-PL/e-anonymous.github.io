@@ -1,20 +1,88 @@
-// public/js/command.js
-
+// commands.js
+import { getAuthToken } from './auth-client.js';
+import AUTH_CONFIG from './auth-config.js';
 
 export async function getCommands() {
     try {
-        const response = await fetch('/api/commands');
-        if (!response.ok) throw new Error(`Błąd pobierania komend: ${response.status}`);
+        const response = await fetch(AUTH_CONFIG.endpoints.commands, {
+            headers: {
+                'Authorization': `Bearer ${getAuthToken()}`
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Błąd pobierania komend: ${response.status}`);
+        }
+        
         const data = await response.json();
-        return data.commands.map(command => `
-            <div class="command-item">
-                <h3>${command.name}</h3>
-                <p>Opis: ${command.description}</p>
-                <button onclick="toggleCommand('${command.id}')">Zmień status</button>
-            </div>
-        `).join('');
+        return data.commands;
     } catch (error) {
-        console.error('Błąd:', error);
-        return '<div class="error">Wystąpił błąd podczas ładowania komend</div>';
+        console.error('Błąd pobierania komend:', error);
+        throw error;
     }
 }
+
+export async function toggleCommand(commandId, active) {
+    try {
+        const response = await fetch(`${AUTH_CONFIG.endpoints.commands}/${commandId}/toggle`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${getAuthToken()}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ active })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Błąd zmiany statusu komendy: ${response.status}`);
+        }
+        
+        return await response.json();
+    } catch (error) {
+        console.error('Błąd przełączania komendy:', error);
+        throw error;
+    }
+}
+
+export async function updateDashboard() {
+    try {
+        const commands = await getCommands();
+        const stats = await getStats();
+        
+        if (document.getElementById('commands')) {
+            document.getElementById('commands').innerHTML = renderCommands(commands);
+        }
+        
+        if (document.getElementById('stats')) {
+            document.getElementById('stats').innerHTML = renderStats(stats);
+        }
+    } catch (error) {
+        console.error('Błąd aktualizacji dashboarda:', error);
+    }
+}
+
+// Helper function to render commands
+function renderCommands(commands) {
+    if (!commands || commands.length === 0) {
+        return '<p>Brak dostępnych komend</p>';
+    }
+    
+    return commands.map(command => `
+        <div class="command-item">
+            <div class="command-info">
+                <h3>${command.name}</h3>
+                <p>${command.description}</p>
+            </div>
+            <button class="btn ${command.active ? 'btn-secondary' : 'btn-danger'}" 
+                data-id="${command.id}" data-active="${command.active}" onclick="toggleCommand('${command.id}', ${!command.active})">
+                ${command.active ? 'Wyłącz' : 'Włącz'}
+            </button>
+        </div>
+    `).join('');
+}
+
+export default {
+    getCommands,
+    toggleCommand,
+    updateDashboard
+};

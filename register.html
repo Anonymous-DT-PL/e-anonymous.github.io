@@ -118,6 +118,8 @@
             cursor: pointer;
             transition: background-color 0.3s ease;
             gap: 0.5rem;
+            text-decoration: none;
+            color: var(--text-color);
         }
 
         .oauth-btn:hover {
@@ -138,11 +140,19 @@
             color: var(--highlight-color);
             text-decoration: none;
         }
+
+        .error-message {
+            color: #ff4d4d;
+            margin-bottom: 1rem;
+            text-align: center;
+            display: none;
+        }
     </style>
 </head>
 <body>
     <div class="register-container">
         <h2 class="register-title">Rejestracja</h2>
+        <div id="errorMessage" class="error-message"></div>
         <form id="registerForm">
             <div class="form-group">
                 <input type="text" id="username" class="form-input" placeholder="Nazwa użytkownika" required>
@@ -182,6 +192,7 @@
 
     <script type="module">
         import { registerUser, loginWithGoogle } from './js/auth-client.js';
+        import AUTH_CONFIG from './js/auth-config.js';
 
         document.getElementById('registerForm').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -189,18 +200,20 @@
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
             const confirmPassword = document.getElementById('confirmPassword').value;
+            const errorMessage = document.getElementById('errorMessage');
 
             if (password !== confirmPassword) {
-                alert('Hasła nie są takie same');
+                errorMessage.textContent = 'Hasła nie są takie same';
+                errorMessage.style.display = 'block';
                 return;
             }
 
             try {
                 await registerUser(username, email, password);
-                alert('Rejestracja zakończona sukcesem');
-                window.location.href = '/dashboard.html';
+                window.location.href = AUTH_CONFIG.redirects.afterRegister;
             } catch (error) {
-                alert(error.message);
+                errorMessage.textContent = error.message || 'Wystąpił błąd podczas rejestracji';
+                errorMessage.style.display = 'block';
             }
         });
 
@@ -208,7 +221,9 @@
             try {
                 await loginWithGoogle();
             } catch (error) {
-                alert(error.message);
+                const errorMessage = document.getElementById('errorMessage');
+                errorMessage.textContent = error.message || 'Wystąpił błąd podczas logowania przez Google';
+                errorMessage.style.display = 'block';
             }
         });
     </script>

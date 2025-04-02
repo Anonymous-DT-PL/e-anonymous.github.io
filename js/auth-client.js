@@ -1,7 +1,8 @@
-// auth.js - Combined backend and frontend authentication
+// auth-client.js - Combined backend and frontend authentication
 
 import * as crypto from 'node:crypto';
 import dotenv from 'dotenv';
+import AUTH_CONFIG from './auth-config.js';
 
 dotenv.config();
 
@@ -178,7 +179,7 @@ export async function verifyToken(token) {
 // Client-side functions that work with the backend
 export async function registerUser(username, email, password) {
     try {
-        const response = await fetch('/api/register', {
+        const response = await fetch(AUTH_CONFIG.endpoints.register, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -201,7 +202,7 @@ export async function registerUser(username, email, password) {
 
 export async function loginUser(email, password) {
     try {
-        const response = await fetch('/api/login', {
+        const response = await fetch(AUTH_CONFIG.endpoints.login, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -216,7 +217,7 @@ export async function loginUser(email, password) {
 
         const data = await response.json();
         // Zapisz token w localStorage
-        localStorage.setItem('authToken', data.token);
+        localStorage.setItem(AUTH_CONFIG.jwt.tokenName, data.token);
         return data.token;
     } catch (error) {
         console.error('Błąd logowania:', error);
@@ -226,20 +227,20 @@ export async function loginUser(email, password) {
 
 export function loginWithGoogle() {
     // Przekieruj do endpointu logowania Google
-    window.location.href = '/login/google';
+    window.location.href = AUTH_CONFIG.endpoints.googleAuth;
 }
 
 export function logout() {
-    localStorage.removeItem('authToken');
-    window.location.href = '/login.html';
+    localStorage.removeItem(AUTH_CONFIG.jwt.tokenName);
+    window.location.href = AUTH_CONFIG.redirects.afterLogout;
 }
 
 export function isLoggedIn() {
-    return !!localStorage.getItem('authToken');
+    return !!localStorage.getItem(AUTH_CONFIG.jwt.tokenName);
 }
 
 export function getAuthToken() {
-    return localStorage.getItem('authToken');
+    return localStorage.getItem(AUTH_CONFIG.jwt.tokenName);
 }
 
 // Export for use in browser environments

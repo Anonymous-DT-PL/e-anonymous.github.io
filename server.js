@@ -24,6 +24,27 @@ const __dirname = path.dirname(__filename);
 // Definicja portu - używaj zmiennej środowiskowej PORT lub domyślnie 3000
 const PORT = process.env.PORT || 3000;
 
+// Database setup
+let dbManager = null;
+
+// Try to import and set up database
+try {
+  const DatabaseManagerModule = await import('./src/main/database/db-manager.js');
+  const DatabaseManager = DatabaseManagerModule.default || DatabaseManagerModule;
+  
+  dbManager = new DatabaseManager(process.env.DB_PATH || path.join(__dirname, 'database.db'));
+  await dbManager.connect();
+  await dbManager.init();
+  
+  // Make it available globally
+  global.dbManager = dbManager;
+  
+  console.log('Database connected successfully');
+} catch (error) {
+  console.error('Error connecting to database:', error);
+  console.warn('Starting without database connection - some features may not work');
+}
+
 const app = express();
 
 // Middleware
@@ -186,6 +207,128 @@ app.get('/api/stats', authenticateToken, (req, res) => {
     res.json(stats);
 });
 
+// Database status endpoint
+app.get('/api/database/status', authenticateToken, async (req, res) => {
+  try {
+    // Only admins can view database status (for security)
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ 
+        message: 'Nie masz uprawnień do wyświetlania statusu bazy danych'
+      });
+    }
+
+    if (!dbManager || !dbManager.isConnected()) {
+      return res.status(200).json({
+        connected: false,
+        message: 'Baza danych nie jest połączona'
+      });
+    }
+
+    // Get database version
+    const versionQuery = await new Promise((resolve, reject) => {
+      dbManager.db.get('SELECT sqlite_version() as version', [], (err, row) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        resolve(row);
+      });
+    });
+
+    // Get tables
+    const tablesQuery = await new Promise((resolve, reject) => {
+      dbManager.db.all(
+        'SELECT name FROM sqlite_master WHERE type="table" AND name NOT LIKE "sqlite_%"', 
+        [], 
+        (err, rows) => {
+          if (err) {
+            reject(err);
+            return;
+          }
+          resolve(rows);
+        }
+      );
+    });
+
+    // Get user count
+    const userCountQuery = await new Promise((resolve, reject) => {
+      dbManager.db.get('SELECT COUNT(*) as count FROM users', [], (err, row) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        resolve(row);
+      });
+    });
+
+    res.status(200).json({
+      connected: true,
+      message: 'Baza danych połączona',
+      version: versionQuery.version,
+      tables: tablesQuery.map(t => t.name),
+      userCount: userCountQuery.count,
+      path: dbManager.getDatabasePath()
+    });
+  } catch (error) {
+    console.error('Błąd pobierania statusu bazy danych:', error);
+    res.status(500).json({ 
+      message: 'Błąd pobierania statusu bazy danych',
+      error: error.message
+    });
+  }
+});
+
+// Database query endpoint - restricted to admins only
+app.post('/api/database/query', authenticateToken, async (req, res) => {
+  try {
+    // Only admins can run queries (for security)
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ 
+        message: 'Nie masz uprawnień do wykonywania zapytań do bazy danych'
+      });
+    }
+
+    if (!dbManager || !dbManager.isConnected()) {
+      return res.status(400).json({
+        message: 'Baza danych nie jest połączona'
+      });
+    }
+
+    const { query, params } = req.body;
+    
+    if (!query) {
+      return res.status(400).json({ message: 'Zapytanie jest wymagane' });
+    }
+    
+    // Security check - only allow SELECT queries
+    const trimmedSql = query.trim().toLowerCase();
+    if (!trimmedSql.startsWith('select')) {
+      return res.status(400).json({ 
+        message: 'Ze względów bezpieczeństwa dozwolone są tylko zapytania SELECT' 
+      });
+    }
+    
+    // Execute query
+    const results = await new Promise((resolve, reject) => {
+      dbManager.db.all(query, params || [], (err, rows) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        resolve(rows);
+      });
+    });
+    
+    res.status(200).json({ results });
+  } catch (error) {
+    console.error('Błąd wykonywania zapytania do bazy danych:', error);
+    res.status(500).json({ 
+      message: 'Błąd wykonywania zapytania do bazy danych',
+      error: error.message
+    });
+  }
+});
+
 // Obsługa endpointu placeholder dla obrazów
 app.get('/api/placeholder/:width/:height', (req, res) => {
     const width = parseInt(req.params.width, 10) || 400;
@@ -231,4 +374,14 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on port ${PORT}`);
 });
 
-export { app, authenticateToken };
+// Handle graceful shutdown
+process.on('SIGINT', async () => {
+    console.log('Shutting down server...');
+    if (dbManager) {
+        await dbManager.close();
+        console.log('Database connection closed');
+    }
+    process.exit(0);
+});
+
+export { app, authenticateToken, dbManager };

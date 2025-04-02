@@ -268,6 +268,33 @@
         .toast.warning {
             border-left: 4px solid var(--warning-color);
         }
+
+        /* Dodatkowe style dla sekcji informacji o bazie danych */
+        .mt-4 {
+            margin-top: 1rem;
+        }
+
+        .bg-dark {
+            background-color: var(--primary-dark);
+        }
+
+        .rounded {
+            border-radius: 8px;
+        }
+
+        .p-3 {
+            padding: 0.75rem;
+        }
+
+        #dbInfo {
+            margin-top: 1rem;
+        }
+
+        #dbInfoContent {
+            padding: 1rem;
+            background-color: var(--primary-dark);
+            border-radius: 8px;
+        }
     </style>
 </head>
 <body>
@@ -315,15 +342,26 @@
             <div class="card">
                 <div class="card-title">
                     <h2>Baza danych</h2>
+                    <button class="btn btn-secondary" id="checkDbConnectionBtn">Sprawdź status</button>
                 </div>
                 <div>
-                    <p id="dbStatus" class="status stopped">Brak połączenia z bazą danych</p>
+                    <p id="dbConnStatus" class="status stopped">Sprawdzanie połączenia z bazą danych...</p>
                     
                     <div class="db-control">
                         <input type="text" id="dbPath" placeholder="Ścieżka do bazy danych" readonly>
                         <div class="button-group">
                             <button id="selectDatabase" class="btn">Wybierz bazę danych</button>
                             <button id="disconnectDatabase" class="btn btn-danger" disabled>Rozłącz</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Database Info Display -->
+                    <div id="dbInfo" class="mt-4" style="display: none;">
+                        <h3>Informacje o bazie danych</h3>
+                        <div id="dbInfoContent" class="p-3 bg-dark rounded">
+                            <p>Wersja SQLite: <span id="dbVersion">Nieznana</span></p>
+                            <p>Tabele: <span id="dbTables">Nieznane</span></p>
+                            <p>Użytkownicy: <span id="dbUserCount">Nieznane</span></p>
                         </div>
                     </div>
                 </div>
@@ -356,11 +394,225 @@
     </div>
 
     <script type="module">
-        import { isLoggedIn, logout, getAuthToken } from '/js/auth-client.js';
-        import { getCommands, toggleCommand } from '/js/commands.js';
-        import { getStats } from '/js/stats.js';
-        import AUTH_CONFIG from '/js/auth-config.js';
-        
+        import { isLoggedIn, logout, getAuthToken } from './js/auth-client.js';
+        import { getCommands, toggleCommand } from './js/commands.js';
+        import { getStats } from './js/stats.js';
+
+        // Inicjalizacja klasy DatabaseController
+        class DatabaseController {
+            constructor(electronAPI) {
+                this.electronAPI = electronAPI;
+                this.dbPath = null;
+                this.connected = false;
+                
+                this.init();
+            }
+            
+            init() {
+                const selectBtn = document.getElementById('selectDatabase');
+                const disconnectBtn = document.getElementById('disconnectDatabase');
+                const checkDbConnectionBtn = document.getElementById('checkDbConnectionBtn');
+                
+                if (selectBtn) {
+                    selectBtn.addEventListener('click', () => this.selectDatabase());
+                }
+                
+                if (disconnectBtn) {
+                    disconnectBtn.addEventListener('click', () => this.disconnectDatabase());
+                }
+                
+                if (checkDbConnectionBtn) {
+                    checkDbConnectionBtn.addEventListener('click', () => this.checkConnection());
+                }
+                
+                // Sprawdź stan połączenia przy starcie
+                this.checkConnection();
+            }
+            
+            async checkConnection() {
+                try {
+                    const dbStatus = document.getElementById('dbConnStatus');
+                    const dbInfo = document.getElementById('dbInfo');
+                    const dbVersion = document.getElementById('dbVersion');
+                    const dbTables = document.getElementById('dbTables');
+                    const dbUserCount = document.getElementById('dbUserCount');
+                    
+                    dbStatus.textContent = 'Sprawdzanie połączenia z bazą danych...';
+                    dbStatus.className = 'status';
+                    
+                    // Sprawdź, czy jesteśmy w kontekście Electron
+                    if (window.electronAPI && window.electronAPI.database) {
+                        // Użyj API Electrona
+                        const status = await window.electronAPI.database.getStatus();
+                        this.connected = status.isConnected;
+                        this.dbPath = status.path;
+                        this.updateUI(status.isConnected);
+                        
+                        if (status.isConnected) {
+                            // Testuj połączenie, aby upewnić się, że działa poprawnie
+                            const result = await window.electronAPI.database.testConnection();
+                            
+                            if (result.connected) {
+                                dbStatus.textContent = 'Baza danych połączona';
+                                dbStatus.className = 'status running';
+                                
+                                // Pokaż i zaktualizuj informacje o bazie danych
+                                dbInfo.style.display = 'block';
+                                dbVersion.textContent = result.version || 'Nieznana';
+                                
+                                // Spróbuj pobrać liczbę tabel, jeśli to możliwe
+                                try {
+                                    const tables = await window.electronAPI.database.query('SELECT name FROM sqlite_master WHERE type="table"');
+                                    dbTables.textContent = Array.isArray(tables) ? tables.length : 'Nieznana';
+                                    
+                                    // Spróbuj pobrać liczbę użytkowników
+                                    const users = await window.electronAPI.database.query('SELECT COUNT(*) as count FROM users');
+                                    dbUserCount.textContent = users && users[0] ? users[0].count : 'Nieznana';
+                                } catch (err) {
+                                    console.error('Błąd pobierania metadanych bazy danych:', err);
+                                    dbTables.textContent = 'Błąd pobierania';
+                                    dbUserCount.textContent = 'Błąd pobierania';
+                                }
+                            } else {
+                                dbStatus.textContent = `Baza danych nie połączona: ${result.message}`;
+                                dbStatus.className = 'status stopped';
+                                dbInfo.style.display = 'none';
+                            }
+                        } else {
+                            dbInfo.style.display = 'none';
+                        }
+                    } else {
+                        // Spróbuj użyć fetch API dla kontekstu web
+                        try {
+                            const response = await fetch('/api/database/status', {
+                                headers: {
+                                    'Authorization': `Bearer ${getAuthToken()}`
+                                }
+                            });
+                            
+                            if (response.ok) {
+                                const data = await response.json();
+                                this.connected = data.connected;
+                                this.dbPath = data.path;
+                                this.updateUI(data.connected);
+                                
+                                if (data.connected) {
+                                    dbStatus.textContent = 'Baza danych połączona';
+                                    dbStatus.className = 'status running';
+                                    dbInfo.style.display = 'block';
+                                    
+                                    // Aktualizuj informacje o bazie danych, jeśli dostępne
+                                    if (data.version) dbVersion.textContent = data.version;
+                                    if (data.tables) dbTables.textContent = data.tables.length;
+                                    if (data.userCount) dbUserCount.textContent = data.userCount;
+                                } else {
+                                    dbStatus.textContent = 'Baza danych nie połączona';
+                                    dbStatus.className = 'status stopped';
+                                    dbInfo.style.display = 'none';
+                                }
+                            } else {
+                                dbStatus.textContent = 'Błąd sprawdzania statusu bazy danych';
+                                dbStatus.className = 'status error';
+                                dbInfo.style.display = 'none';
+                                this.updateUI(false);
+                            }
+                        } catch (error) {
+                            console.error('Błąd podczas sprawdzania połączenia z bazą danych:', error);
+                            dbStatus.textContent = 'API bazy danych niedostępne';
+                            dbStatus.className = 'status error';
+                            dbInfo.style.display = 'none';
+                            this.updateUI(false);
+                        }
+                    }
+                } catch (error) {
+                    console.error('Błąd sprawdzania połączenia:', error);
+                    const dbStatus = document.getElementById('dbConnStatus');
+                    dbStatus.textContent = `Błąd: ${error.message}`;
+                    dbStatus.className = 'status error';
+                    document.getElementById('dbInfo').style.display = 'none';
+                    this.updateUI(false);
+                }
+            }
+            
+            async selectDatabase() {
+                if (!this.electronAPI && !window.electronAPI) {
+                    showToast('API Electrona nie jest dostępne', 'error');
+                    return;
+                }
+                
+                try {
+                    // Używa API z preload.js
+                    const api = this.electronAPI || window.electronAPI;
+                    const result = await api.database.openDatabase();
+                    
+                    if (result && result.isConnected) {
+                        this.connected = true;
+                        this.dbPath = result.path;
+                        this.updateUI(true);
+                        showToast('Połączono z bazą danych', 'success');
+                        
+                        // Odśwież informacje
+                        this.checkConnection();
+                    } else if (result && result.error) {
+                        showToast(`Błąd połączenia z bazą danych: ${result.error.message}`, 'error');
+                    } else {
+                        showToast('Nie wybrano bazy danych', 'warning');
+                    }
+                } catch (error) {
+                    console.error('Błąd podczas wybierania bazy danych:', error);
+                    showToast('Błąd podczas wybierania bazy danych', 'error');
+                }
+            }
+            
+            async disconnectDatabase() {
+                if (!this.electronAPI && !window.electronAPI) {
+                    showToast('API Electrona nie jest dostępne', 'error');
+                    return;
+                }
+                
+                try {
+                    const api = this.electronAPI || window.electronAPI;
+                    await api.database.disconnect();
+                    this.connected = false;
+                    this.dbPath = null;
+                    this.updateUI(false);
+                    
+                    // Ukryj sekcję informacji
+                    document.getElementById('dbInfo').style.display = 'none';
+                    
+                    showToast('Rozłączono z bazą danych', 'success');
+                } catch (error) {
+                    console.error('Błąd podczas rozłączania bazy danych:', error);
+                    showToast('Błąd podczas rozłączania bazy danych', 'error');
+                }
+            }
+            
+            updateUI(connected) {
+                const dbStatus = document.getElementById('dbConnStatus');
+                const dbPath = document.getElementById('dbPath');
+                const disconnectBtn = document.getElementById('disconnectDatabase');
+                const selectBtn = document.getElementById('selectDatabase');
+                
+                if (connected) {
+                    if (dbStatus) {
+                        dbStatus.textContent = 'Połączono';
+                        dbStatus.className = 'status running';
+                    }
+                    if (dbPath) dbPath.value = this.dbPath || '';
+                    if (disconnectBtn) disconnectBtn.disabled = false;
+                    if (selectBtn) selectBtn.disabled = true;
+                } else {
+                    if (dbStatus) {
+                        dbStatus.textContent = 'Brak połączenia z bazą danych';
+                        dbStatus.className = 'status stopped';
+                    }
+                    if (dbPath) dbPath.value = '';
+                    if (disconnectBtn) disconnectBtn.disabled = true;
+                    if (selectBtn) selectBtn.disabled = false;
+                }
+            }
+        }
+
         // Funkcja do wyświetlania powiadomień
         function showToast(message, type = 'success') {
             const toast = document.getElementById('toast');
@@ -435,80 +687,6 @@
             });
         }
 
-        // Sprawdź czy użytkownik jest zalogowany
-        document.addEventListener('DOMContentLoaded', async () => {
-            // Jeśli nie jest zalogowany, przekieruj do strony logowania
-            if (!isLoggedIn()) {
-                window.location.href = '/login.html';
-                return;
-            }
-
-            // Sprawdź token i pobierz dane użytkownika
-            try {
-                const response = await fetch('/api/dashboard', {
-                    headers: {
-                        'Authorization': `Bearer ${getAuthToken()}`
-                    }
-                });
-
-                if (!response.ok) {
-                    throw new Error('Nieprawidłowy token');
-                }
-
-                const data = await response.json();
-                document.getElementById('username').textContent = data.user.username || 'Użytkownik';
-                
-                // Załaduj komendy i statystyki
-                updateDashboard();
-                
-                // Inicjalizuj kontroler bazy danych
-                if (window.electronAPI) {
-                    window.databaseController = new DatabaseController(window.electronAPI);
-                } else {
-                    console.warn('API Electrona nie jest dostępne');
-                    document.getElementById('dbStatus').textContent = 'API Electrona nie jest dostępne';
-                }
-                
-                // Inicjalizuj przyciski akcji
-                initActionButtons();
-                
-                // Dodaj obsługę przycisku wylogowania
-                document.getElementById('logoutBtn').addEventListener('click', () => {
-                    logout();
-                });
-                
-                // Dodaj obsługę przycisków odświeżania
-                document.getElementById('refreshCommandsBtn').addEventListener('click', async () => {
-                    try {
-                        const commands = await getCommands();
-                        renderCommands(commands);
-                        showToast('Komendy zostały odświeżone', 'success');
-                    } catch (error) {
-                        console.error('Błąd podczas odświeżania komend:', error);
-                        showToast('Błąd podczas odświeżania komend', 'error');
-                    }
-                });
-                
-                document.getElementById('refreshStatsBtn').addEventListener('click', async () => {
-                    try {
-                        const stats = await getStats();
-                        renderStats(stats);
-                        showToast('Statystyki zostały odświeżone', 'success');
-                    } catch (error) {
-                        console.error('Błąd podczas odświeżania statystyk:', error);
-                        showToast('Błąd podczas odświeżania statystyk', 'error');
-                    }
-                });
-                
-            } catch (error) {
-                console.error('Błąd autoryzacji:', error);
-                logout(); // Wyloguj użytkownika w przypadku błędu autoryzacji
-            }
-        });
-    </script>
-</body>
-</html>
-
         // Funkcja do renderowania statystyk
         function renderStats(stats) {
             const statsContainer = document.getElementById('stats');
@@ -523,101 +701,6 @@
             statsText += `Użyto komend: ${stats.commands_used}\n`;
             
             statsContainer.textContent = statsText;
-        }
-
-        // Inicjalizacja kontrolera bazy danych
-        class DatabaseController {
-            constructor(electronAPI) {
-                this.electronAPI = electronAPI;
-                this.dbPath = null;
-                this.connected = false;
-                
-                this.init();
-            }
-            
-            init() {
-                const selectBtn = document.getElementById('selectDatabase');
-                const disconnectBtn = document.getElementById('disconnectDatabase');
-                
-                selectBtn.addEventListener('click', () => this.selectDatabase());
-                disconnectBtn.addEventListener('click', () => this.disconnectDatabase());
-                
-                // Sprawdź stan połączenia przy starcie
-                this.checkConnection();
-            }
-            
-            async checkConnection() {
-                if (!this.electronAPI) return;
-                
-                try {
-                    const connection = await this.electronAPI.getDatabaseConnection();
-                    if (connection.connected) {
-                        this.connected = true;
-                        this.dbPath = connection.path;
-                        this.updateUI(true);
-                    } else {
-                        this.updateUI(false);
-                    }
-                } catch (error) {
-                    console.error('Błąd sprawdzania połączenia:', error);
-                    this.updateUI(false);
-                }
-            }
-            
-            async selectDatabase() {
-                if (!this.electronAPI) {
-                    showToast('API Electrona nie jest dostępne', 'error');
-                    return;
-                }
-                
-                try {
-                    const result = await this.electronAPI.selectDatabase();
-                    if (result.success) {
-                        this.connected = true;
-                        this.dbPath = result.path;
-                        this.updateUI(true);
-                        showToast('Połączono z bazą danych', 'success');
-                    } else {
-                        showToast('Nie wybrano bazy danych', 'warning');
-                    }
-                } catch (error) {
-                    console.error('Błąd podczas wybierania bazy danych:', error);
-                    showToast('Błąd podczas wybierania bazy danych', 'error');
-                }
-            }
-            
-            async disconnectDatabase() {
-                if (!this.electronAPI) return;
-                
-                try {
-                    await this.electronAPI.disconnectDatabase();
-                    this.connected = false;
-                    this.dbPath = null;
-                    this.updateUI(false);
-                    showToast('Rozłączono z bazą danych', 'success');
-                } catch (error) {
-                    console.error('Błąd podczas rozłączania bazy danych:', error);
-                    showToast('Błąd podczas rozłączania bazy danych', 'error');
-                }
-            }
-            
-            updateUI(connected) {
-                const dbStatus = document.getElementById('dbStatus');
-                const dbPath = document.getElementById('dbPath');
-                const disconnectBtn = document.getElementById('disconnectDatabase');
-                
-                if (connected) {
-                    dbStatus.textContent = 'Połączono';
-                    dbStatus.className = 'status running';
-                    dbPath.value = this.dbPath;
-                    disconnectBtn.disabled = false;
-                } else {
-                    dbStatus.textContent = 'Brak połączenia z bazą danych';
-                    dbStatus.className = 'status stopped';
-                    dbPath.value = '';
-                    disconnectBtn.disabled = true;
-                }
-            }
         }
 
         // Funkcja do inicjalizacji przycisków akcji
@@ -691,3 +774,143 @@
                 }
             });
         }
+
+        // Sprawdź czy użytkownik jest zalogowany
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Jeśli nie jest zalogowany, przekieruj do strony logowania
+            if (!isLoggedIn()) {
+                window.location.href = '/login.html';
+                return;
+            }
+
+            // Sprawdź token i pobierz dane użytkownika
+            try {
+                const response = await fetch('/api/dashboard', {
+                    headers: {
+                        'Authorization': `Bearer ${getAuthToken()}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Nieprawidłowy token');
+                }
+
+                const data = await response.json();
+                document.getElementById('username').textContent = data.user.username || 'Użytkownik';
+                
+                // Załaduj komendy i statystyki
+                updateDashboard();
+                
+                // Inicjalizuj kontroler bazy danych
+                if (window.electronAPI) {
+                    window.databaseController = new DatabaseController(window.electronAPI);
+                } else {
+                    console.warn('API Electrona nie jest dostępne');
+                    document.getElementById('dbConnStatus').textContent = 'API Electrona nie jest dostępne';
+                }
+                
+                // Inicjalizuj przyciski akcji
+                initActionButtons();
+                
+                // Dodaj obsługę przycisku wylogowania
+                document.getElementById('logoutBtn').addEventListener('click', () => {
+                    logout();
+                });
+                
+                // Dodaj obsługę przycisków odświeżania
+                document.getElementById('refreshCommandsBtn').addEventListener('click', async () => {
+                    try {
+                        const commands = await getCommands();
+                        renderCommands(commands);
+                        showToast('Komendy zostały odświeżone', 'success');
+                    } catch (error) {
+                        console.error('Błąd podczas odświeżania komend:', error);
+                        showToast('Błąd podczas odświeżania komend', 'error');
+                    }
+                });
+                
+                document.getElementById('refreshStatsBtn').addEventListener('click', async () => {
+                    try {
+                        const stats = await getStats();
+                        renderStats(stats);
+                        showToast('Statystyki zostały odświeżone', 'success');
+                    } catch (error) {
+                        console.error('Błąd podczas odświeżania statystyk:', error);
+                        showToast('Błąd podczas odświeżania statystyk', 'error');
+                    }
+                });
+                
+                // Wykonaj początkowe sprawdzenie połączenia z bazą danych
+                setTimeout(() => {
+                    document.getElementById('checkDbConnectionBtn').click();
+                }, 1000);
+                
+            } catch (error) {
+                console.error('Błąd autoryzacji:', error);
+                logout(); // Wyloguj użytkownika w przypadku błędu autoryzacji
+            }
+        });
+
+        // Przygotuj moduł commands.js jeśli nie istnieje
+        if (typeof getCommands !== 'function') {
+            window.getCommands = async function() {
+                try {
+                    const response = await fetch('/api/commands', {
+                        headers: {
+                            'Authorization': `Bearer ${getAuthToken()}`
+                        }
+                    });
+                    
+                    if (!response.ok) throw new Error('Nie udało się pobrać komend');
+                    
+                    const data = await response.json();
+                    return data.commands;
+                } catch (error) {
+                    console.error('Błąd pobierania komend:', error);
+                    throw error;
+                }
+            };
+            
+            window.toggleCommand = async function(id, active) {
+                try {
+                    const response = await fetch(`/api/commands/${id}/toggle`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${getAuthToken()}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ active })
+                    });
+                    
+                    if (!response.ok) throw new Error('Nie udało się przełączyć komendy');
+                    
+                    return await response.json();
+                } catch (error) {
+                    console.error('Błąd przełączania komendy:', error);
+                    throw error;
+                }
+            };
+        }
+        
+        // Przygotuj moduł stats.js jeśli nie istnieje
+        if (typeof getStats !== 'function') {
+            window.getStats = async function() {
+                try {
+                    const response = await fetch('/api/stats', {
+                        headers: {
+                            'Authorization': `Bearer ${getAuthToken()}`
+                        }
+                    });
+                    
+                    if (!response.ok) throw new Error('Nie udało się pobrać statystyk');
+                    
+                    return await response.json();
+                } catch (error) {
+                    console.error('Błąd pobierania statystyk:', error);
+                    throw error;
+                }
+            };
+        }
+    </script>
+</body>
+</html>

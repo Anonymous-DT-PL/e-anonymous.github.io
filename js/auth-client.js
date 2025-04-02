@@ -1,12 +1,45 @@
-// auth-client.js - Combined backend and frontend authentication
-
+// js/auth-client.js - Updated for database integration
 import * as crypto from 'node:crypto';
 import dotenv from 'dotenv';
 import AUTH_CONFIG from './auth-config.js';
 
 dotenv.config();
 
-// In-memory storage instead of MongoDB
+// Check if we have a DatabaseManager instance
+let dbManager = null;
+
+// Try to connect to the database
+try {
+  const getDatabaseManager = () => {
+    // In Electron context
+    if (typeof window !== 'undefined' && window.electronAPI) {
+      return window.electronAPI.database.getStatus()
+        .then(status => {
+          if (status.isConnected) {
+            return true;
+          }
+          return false;
+        });
+    }
+    // In Node.js context
+    else if (typeof global !== 'undefined' && global.dbManager) {
+      return Promise.resolve(global.dbManager);
+    }
+    return Promise.resolve(false);
+  };
+
+  // Set up database connection when module is loaded
+  getDatabaseManager().then(manager => {
+    dbManager = manager;
+    console.log('Authentication client using database manager');
+  }).catch(err => {
+    console.warn('Could not get database manager, using in-memory storage:', err);
+  });
+} catch (e) {
+  console.warn('Error initializing database connection:', e);
+}
+
+// In-memory storage as fallback
 const users = new Map();
 
 // Encryption functions
@@ -32,9 +65,30 @@ function decryptData(encryptedData, secretKey) {
 
 // Backend functions
 export async function registerUserBackend(username, email, password) {
+    // Try to use database if available
+    if (dbManager) {
+        try {
+            // Format data for database
+            const userData = {
+                username,
+                email,
+                password,
+                authProvider: 'local'
+            };
+            
+            // Create user in database
+            const user = await dbManager.createUser(userData);
+            return user.id;
+        } catch (error) {
+            console.error('Database user registration error:', error);
+            // Fall back to in-memory if database fails
+        }
+    }
+    
+    // Fall back to in-memory storage
     // Check if user already exists
     if (users.has(email)) {
-        throw new Error('Użytkownik o tym adresie email już istnieje');
+        throw new Error('User with this email already exists');
     }
 
     // Generate a unique encryption key for this user
@@ -75,10 +129,50 @@ export async function registerUserBackend(username, email, password) {
 }
 
 export async function loginUserBackend(email, password) {
+    // Try to use database if available
+    if (dbManager) {
+        try {
+            const user = await dbManager.getUserByEmail(email);
+            if (!user) {
+                throw new Error('User not found');
+            }
+            
+            // Verify password (handled by AuthService in the database version)
+            // Import bcrypt if needed
+            const bcrypt = await import('bcryptjs');
+            const isMatch = await bcrypt.compare(password, user.password_hash);
+            
+            // Continuing from where we left off in auth-client.js
+            if (!isMatch) {
+                throw new Error('Invalid email or password');
+            }
+            
+            // Update last login time
+            await dbManager.updateUserLogin(user.id);
+            
+            // Generate token using JWT in a real app
+            // For simplicity, we'll use a similar method to our in-memory version
+            const token = generateToken({
+                id: user.id,
+                email: user.email,
+                username: user.username
+            });
+            
+            // Store session in database
+            await dbManager.createSession(user.id, token);
+            
+            return token;
+        } catch (error) {
+            console.error('Database login error:', error);
+            // Fall back to in-memory if database fails
+        }
+    }
+
+    // Fall back to in-memory storage
     // Find user by email
     const userRecord = users.get(email);
     if (!userRecord) {
-        throw new Error('Użytkownik nie został znaleziony');
+        throw new Error('User not found');
     }
 
     // Try to decrypt user data
@@ -89,7 +183,7 @@ export async function loginUserBackend(email, password) {
         
         userData = decryptData(userRecord.encryptedData, userEncryptionKey);
     } catch (error) {
-        throw new Error('Błąd podczas deszyfrowania danych');
+        throw new Error('Error decrypting data');
     }
 
     // Verify password
@@ -102,7 +196,7 @@ export async function loginUserBackend(email, password) {
     ).toString('hex');
     
     if (hashedInputPassword !== userData.hashedPassword) {
-        throw new Error('Nieprawidłowe hasło');
+        throw new Error('Invalid password');
     }
 
     // Generate JWT or session token
@@ -111,6 +205,51 @@ export async function loginUserBackend(email, password) {
 }
 
 export async function loginWithGoogleBackend(googleProfile) {
+    // Try to use database if available
+    if (dbManager) {
+        try {
+            // Check if user exists by Google ID
+            let user = await dbManager.getUserByProviderAuthId('google', googleProfile.sub);
+            
+            if (!user) {
+                // Check if user exists by email
+                user = await dbManager.getUserByEmail(googleProfile.email);
+                
+                if (!user) {
+                    // Create new user
+                    user = await dbManager.createUser({
+                        username: googleProfile.name || googleProfile.email.split('@')[0],
+                        email: googleProfile.email,
+                        authProvider: 'google',
+                        authProviderId: googleProfile.sub
+                    });
+                } else {
+                    // User exists but doesn't have Google authentication
+                    // This would need careful handling in a real app
+                    console.warn('User exists with different auth method');
+                }
+            }
+            
+            // Update last login time
+            await dbManager.updateUserLogin(user.id);
+            
+            // Generate token
+            const token = generateToken({
+                id: user.id,
+                email: user.email,
+                username: user.username
+            });
+            
+            // Store session
+            await dbManager.createSession(user.id, token);
+            
+            return token;
+        } catch (error) {
+            console.error('Database Google login error:', error);
+            // Fall back to in-memory if database fails
+        }
+    }
+
     // Check if user already exists
     let userRecord = users.get(googleProfile.email);
 
@@ -154,6 +293,7 @@ export async function loginWithGoogleBackend(googleProfile) {
 function generateToken(userData) {
     // In a production environment, use a proper JWT library
     const payload = {
+        id: userData.id,
         email: userData.email,
         username: userData.username,
         timestamp: Date.now()
@@ -164,6 +304,35 @@ function generateToken(userData) {
 }
 
 export async function verifyToken(token) {
+    // Try to use database if available
+    if (dbManager) {
+        try {
+            // Check if token exists in sessions table
+            const session = await dbManager.getSessionByToken(token);
+            
+            if (!session) {
+                throw new Error('Invalid token or session expired');
+            }
+            
+            // Get user data
+            const user = await dbManager.getUserById(session.user_id);
+            
+            if (!user) {
+                throw new Error('User not found');
+            }
+            
+            // Return user data
+            return {
+                id: user.id,
+                email: user.email,
+                username: user.username
+            };
+        } catch (error) {
+            console.error('Database token verification error:', error);
+            // Fall back to in-memory if database fails
+        }
+    }
+
     try {
         const payload = JSON.parse(Buffer.from(token, 'base64').toString('utf-8'));
         
@@ -172,7 +341,7 @@ export async function verifyToken(token) {
         
         return payload;
     } catch (error) {
-        throw new Error('Nieprawidłowy token');
+        throw new Error('Invalid token');
     }
 }
 
@@ -189,13 +358,13 @@ export async function registerUser(username, email, password) {
 
         if (!response.ok) {
             const errorData = await response.json();
-            throw new Error(errorData.message || 'Błąd rejestracji');
+            throw new Error(errorData.message || 'Registration error');
         }
 
         const data = await response.json();
         return data.userId;
     } catch (error) {
-        console.error('Błąd rejestracji:', error);
+        console.error('Registration error:', error);
         throw error;
     }
 }
@@ -212,21 +381,21 @@ export async function loginUser(email, password) {
 
         if (!response.ok) {
             const errorData = await response.json();
-            throw new Error(errorData.message || 'Błąd logowania');
+            throw new Error(errorData.message || 'Login error');
         }
 
         const data = await response.json();
-        // Zapisz token w localStorage
+        // Save token in localStorage
         localStorage.setItem(AUTH_CONFIG.jwt.tokenName, data.token);
         return data.token;
     } catch (error) {
-        console.error('Błąd logowania:', error);
+        console.error('Login error:', error);
         throw error;
     }
 }
 
 export function loginWithGoogle() {
-    // Przekieruj do endpointu logowania Google
+    // Redirect to Google auth endpoint
     window.location.href = AUTH_CONFIG.endpoints.googleAuth;
 }
 

@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-Anonymous - Logowanie</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/lucide-react/0.263.1/lucide.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-dark: #0f0f0f;
+            --secondary-dark: #1a1a1a;
+            --accent-color: #4a4a4a;
+            --text-color: #e0e0e0;
+            --highlight-color: #6b4eff;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', 'Arial', sans-serif;
+            background-color: var(--primary-dark);
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .login-container {
+            background-color: var(--secondary-dark);
+            border-radius: 15px;
+            padding: 2rem;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+        }
+
+        .login-title {
+            text-align: center;
+            margin-bottom: 1.5rem;
+            color: var(--highlight-color);
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 0.75rem;
+            background-color: var(--primary-dark);
+            border: 1px solid var(--accent-color);
+            border-radius: 8px;
+            color: var(--text-color);
+            transition: border-color 0.3s ease;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--highlight-color);
+        }
+
+        .btn {
+            width: 100%;
+            padding: 0.75rem;
+            background-color: var(--highlight-color);
+            color: var(--text-color);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .btn:hover {
+            background-color: #5a3ecf;
+        }
+
+        .oauth-divider {
+            display: flex;
+            align-items: center;
+            margin: 1.5rem 0;
+        }
+
+        .oauth-divider::before,
+        .oauth-divider::after {
+            content: '';
+            flex-grow: 1;
+            height: 1px;
+            background-color: var(--accent-color);
+        }
+
+        .oauth-divider span {
+            margin: 0 1rem;
+            color: var(--accent-color);
+        }
+
+        .oauth-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            padding: 0.75rem;
+            background-color: var(--primary-dark);
+            border: 1px solid var(--accent-color);
+            border-radius: 8px;
+            color: var(--text-color);
+            gap: 10px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .oauth-btn:hover {
+            background-color: var(--accent-color);
+        }
+
+        .register-link {
+            text-align: center;
+            margin-top: 1rem;
+        }
+
+        .error-message {
+            color: #ff4d4d;
+            text-align: center;
+            margin-bottom: 1rem;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <h2 class="login-title">Logowanie</h2>
+        <div id="errorMessage" class="error-message"></div>
+        <form id="loginForm">
+            <div class="form-group">
+                <input type="email" id="email" class="form-input" placeholder="Adres email" required>
+            </div>
+            <div class="form-group">
+                <input type="password" id="password" class="form-input" placeholder="Hasło" required>
+            </div>
+            <button type="submit" class="btn">Zaloguj się</button>
+        </form>
+
+        <div class="oauth-divider">
+            <span>lub</span>
+        </div>
+
+        <button id="googleLogin" class="oauth-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.45h3.57c2.08-1.92 3.28-4.74 3.28-8.07z" fill="#4285F4"/>
+                <path d="M12 23c2.97 0 5.46-1 7.28-2.69l-3.57-2.77c-.99.69-2.26 1.1-3.71 1.1-2.87 0-5.3-1.95-6.16-4.57H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.86-2.62 3.29-4.53 6.16-4.53z" fill="#EA4335"/>
+            </svg>
+            Zaloguj się przez Google
+        </button>
+
+        <div class="register-link">
+            Nie masz konta? <a href="/register.html">Zarejestruj się</a>
+        </div>
+    </div>
+
+    <script type="module">
+        import { loginUser, loginWithGoogle } from '/js/auth.js';
+
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const errorMessage = document.getElementById('errorMessage');
+
+            try {
+                await loginUser(email, password);
+                window.location.href = '/dashboard.html';
+            } catch (error) {
+                errorMessage.textContent = error.message;
+                errorMessage.style.display = 'block';
+            }
+        });
+
+        document.getElementById('googleLogin').addEventListener('click', async () => {
+            try {
+                await loginWithGoogle();
+            } catch (error) {
+                const errorMessage = document.getElementById('errorMessage');
+                errorMessage.textContent = error.message;
+                errorMessage.style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,8 +1,14 @@
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 import cors from 'cors';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+
+// ES Module equivalents for __dirname and __filename
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -11,7 +17,7 @@ const SECRET_KEY = 'twoj_sekretny_klucz_jwt';
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(process.cwd(), 'public')));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Symulowana baza użytkowników (zastąp prawdziwą bazą danych)
 const users = [];
@@ -54,7 +60,12 @@ app.post('/api/register', async (req, res) => {
         id: users.length + 1,
         username,
         email,
-        password: hashedPassword
+        password: hashedPassword,
+        commands: [],
+        stats: {
+            commands_used: 0,
+            servers: 0
+        }
     };
     
     users.push(newUser);
@@ -90,19 +101,74 @@ app.post('/api/login', async (req, res) => {
     res.json({ token, user: { username: user.username, email: user.email } });
 });
 
-// Chroniony route dashboardu
-app.get('/api/dashboard', authenticateToken, (req, res) => {
-    res.json({ 
-        message: 'Witaj w panelu!', 
-        user: req.user 
+// Profil użytkownika
+app.get('/api/user/profile', authenticateToken, (req, res) => {
+    const user = users.find(u => u.id === req.user.id);
+    if (!user) {
+        return res.status(404).json({ error: 'Użytkownik nie został znaleziony' });
+    }
+    
+    res.json({
+        username: user.username,
+        email: user.email
     });
 });
 
-// Trasy dla stron
-app.get('/', (req, res) => {
-    res.sendFile(path.join(process.cwd(), 'public', 'index.html'));
+// Lista komend
+app.get('/api/commands', authenticateToken, (req, res) => {
+    const user = users.find(u => u.id === req.user.id);
+    if (!user) {
+        return res.status(404).json({ error: 'Użytkownik nie został znaleziony' });
+    }
+
+    // Domyślne komendy, które można rozszerzyć
+    const defaultCommands = [
+        { name: 'Wiadomości', description: 'Wyświetl prywatne wiadomości', active: true },
+        { name: 'Ustawienia', description: 'Zarządzaj ustawieniami konta', active: true },
+        { name: 'Historia', description: 'Przeglądaj historię aktywności', active: false }
+    ];
+
+    res.json(defaultCommands);
 });
 
+// Statystyki
+app.get('/api/stats', authenticateToken, (req, res) => {
+    const user = users.find(u => u.id === req.user.id);
+    if (!user) {
+        return res.status(404).json({ error: 'Użytkownik nie został znaleziony' });
+    }
+
+    // Przykładowe statystyki globalne
+    res.json({
+        users: users.length,
+        servers: Math.floor(Math.random() * 50), // Losowa liczba serwerów
+        commands_used: users.reduce((sum, u) => sum + (u.stats?.commands_used || 0), 0)
+    });
+});
+
+// Dynamiczna obsługa tras HTML
+app.get('*', (req, res) => {
+    // Lista możliwych ścieżek plików
+    const possibleFiles = [
+        path.join(__dirname, 'public', 'html', req.path.replace(/^\//, '')),
+        path.join(__dirname, 'public', req.path.replace(/^\//, '')),
+        path.join(__dirname, 'public', 'html', 'index.html'),
+        path.join(__dirname, 'public', 'index.html')
+    ];
+
+    // Próba znalezienia istniejącego pliku
+    for (const filePath of possibleFiles) {
+        if (fs.existsSync(filePath) && path.extname(filePath)) {
+            return res.sendFile(filePath);
+        }
+    }
+
+    // Jeśli nie znaleziono pliku, wyślij domyślny index.html
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Uruchomienie serwera
 app.listen(PORT, () => {
     console.log(`Serwer działa na porcie ${PORT}`);
+    console.log(`Katalog główny: ${__dirname}`);
 });
